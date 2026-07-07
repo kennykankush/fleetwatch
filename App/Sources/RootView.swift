@@ -25,6 +25,12 @@ enum AppSection: String, CaseIterable, Identifiable {
 struct RootView: View {
     @State private var selection: AppSection = .overview
 
+    /// Read from the bundle so the footer can never drift from the release.
+    static var appVersion: String {
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+        return "v\(v)"
+    }
+
     var body: some View {
         NavigationSplitView {
             List(AppSection.allCases, selection: $selection) { section in
@@ -48,7 +54,7 @@ struct RootView: View {
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 HStack {
-                    Text("0.1.0")
+                    Text(Self.appVersion)
                         .font(.caption2)
                         .foregroundStyle(.quaternary)
                     Spacer()
