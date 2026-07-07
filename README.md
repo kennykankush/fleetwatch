@@ -16,10 +16,28 @@ It shows **both truths about your disk**: physical bytes on disk, and effective
 space after purgeable — because a meter that silently switches between the two
 is exactly how this app got born.
 
+## Install
+
+**Homebrew** (the repo is its own tap):
+
+```sh
+brew tap kennykankush/stockpile https://github.com/kennykankush/stockpile
+brew install --cask stockpile
+```
+
+**Installer script:**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/kennykankush/stockpile/main/scripts/install.sh | sh
+```
+
+**Manual:** grab `Stockpile-x.y.z.zip` from the
+[latest release](https://github.com/kennykankush/stockpile/releases/latest),
+unzip, drop into Applications. Signed with Developer ID and notarized by
+Apple — it opens with no warnings.
+
 > [!NOTE]
-> Stockpile is in active development and not yet notarized for distribution.
-> Build from source below, and read [VISION.md](VISION.md) — every decision
-> traces back to it.
+> Read [VISION.md](VISION.md) — every decision traces back to it.
 
 ## Features
 
