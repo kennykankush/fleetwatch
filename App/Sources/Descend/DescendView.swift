@@ -13,11 +13,19 @@ final class DescendModel {
     var scanError: String?
 
     private var cache: [String: [ScannedEntry]] = [:]
+    /// The clear-generation this session cache was built against; if the
+    /// global one moved (a clear happened), our sizes are stale (F-005).
+    private var seenMutationGeneration = 0
 
     var current: URL { path.last ?? FileManager.default.homeDirectoryForCurrentUser }
 
     func show(_ url: URL) async {
         scanError = nil
+        // A clear elsewhere invalidates every cached size — drop them.
+        if Mutations.shared.generation != seenMutationGeneration {
+            seenMutationGeneration = Mutations.shared.generation
+            cache.removeAll()
+        }
         if let hit = cache[url.path] {
             entries = hit
             return

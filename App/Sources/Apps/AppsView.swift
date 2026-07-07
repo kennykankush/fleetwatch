@@ -123,22 +123,31 @@ struct AppsView: View {
         self.plan = nil
         Task {
             if let owner {
-                owner.terminate()
-                try? await Task.sleep(for: .seconds(1))
+                let quit = await RunningApps.quitAndWait(owner)
+                if !quit {
+                    banner = (message: "\(plan.app.name) is still running — uninstall aborted. Quit it and try again.", isError: true)
+                    return
+                }
             }
             do {
-                let description = try await Task.detached(priority: .userInitiated) {
+                let outcome = try await Task.detached(priority: .userInitiated) {
                     try UninstallAction.uninstall(plan.app, leftovers: plan.leftovers, brew: .local())
                 }.value
                 await LedgerStore.shared.append(LedgerEvent(
                     kind: .cleared,
                     title: "Uninstalled \(plan.app.name)",
-                    detail: description,
+                    detail: outcome.description,
                     bytes: plan.totalBytes
                 ))
                 model.apps.removeAll { $0.id == plan.app.id }
-                banner = (message: "\(description) — \(plan.totalBytes.bytesFormatted) freed.", isError: false)
+                banner = (message: "\(outcome.description) — \(plan.totalBytes.bytesFormatted) freed.", isError: false)
             } catch {
+                // F-009: failures are ledgered, not just bannered.
+                await LedgerStore.shared.append(LedgerEvent(
+                    kind: .cleared,
+                    title: "Uninstall failed: \(plan.app.name)",
+                    detail: error.localizedDescription
+                ))
                 banner = (message: "Couldn't uninstall \(plan.app.name): \(error.localizedDescription)", isError: true)
             }
         }

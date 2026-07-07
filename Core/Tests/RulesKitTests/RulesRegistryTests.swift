@@ -17,6 +17,26 @@ struct RulesRegistryTests {
         }
     }
 
+    @Test("F-004: no wholesale cache-directory rules, generics are sensitive")
+    func sensitiveCacheRules() throws {
+        let registry = try RulesRegistry.bundled()
+        let home = URL(fileURLWithPath: "/Users/example")
+
+        // The wholesale root rules are gone — the app never offers to trash
+        // the entire ~/Library/Caches or ~/.cache directory.
+        #expect(registry.match(directoryAt: home.appending(path: "Library/Caches"), home: home) == nil)
+        #expect(registry.match(directoryAt: home.appending(path: ".cache"), home: home) == nil)
+
+        // A generic child match is still recognized, but flagged sensitive so
+        // it's never presented as "zero cost" and warns before clearing.
+        let generic = registry.match(directoryAt: home.appending(path: ".cache/some-tool"), home: home)
+        #expect(generic?.sensitive == true)
+
+        // A specific, known cache is NOT sensitive.
+        let spotify = registry.match(directoryAt: home.appending(path: "Library/Caches/com.spotify.client"), home: home)
+        #expect(spotify?.sensitive == false)
+    }
+
     @Test("node_modules matches only beside a package.json")
     func nodeModulesNeedsSibling() throws {
         let registry = try RulesRegistry.bundled()

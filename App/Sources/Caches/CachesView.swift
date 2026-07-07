@@ -3,6 +3,16 @@ import ScannerKit
 import RulesKit
 import LedgerKit
 
+/// A global signal that something was cleared, so other views (Descend)
+/// can drop stale cached sizes without polling (F-005).
+@MainActor
+@Observable
+final class Mutations {
+    static let shared = Mutations()
+    private(set) var generation = 0
+    func bump() { generation += 1 }
+}
+
 /// Shared reclaimable state — built once, observed by Overview and Caches.
 @MainActor
 @Observable
@@ -12,9 +22,23 @@ final class ReclaimableModel {
     var items: [ReclaimableItem] = []
     var isLoading = false
     private var loaded = false
+    /// Bumped on any mutation; an in-flight build with a stale generation
+    /// discards its result rather than resurrecting a cleared row (F-006).
+    private var generation = 0
 
     var totals: [Tier: Int64] { ReclaimableIndex.totals(of: items) }
     var grandTotal: Int64 { items.reduce(0) { $0 + $1.sizeBytes } }
+    /// "Zero cost" excludes sensitive matches (login-bearing caches) — the
+    /// honest free-to-clear figure (F-004).
+    var freeToClearBytes: Int64 {
+        items.filter { $0.rule.tier == .cache && !$0.rule.sensitive }.reduce(0) { $0 + $1.sizeBytes }
+    }
+    var regenerableBytes: Int64 {
+        items.filter { $0.rule.tier == .regenerable }.reduce(0) { $0 + $1.sizeBytes }
+    }
+    var sensitiveBytes: Int64 {
+        items.filter { $0.rule.sensitive }.reduce(0) { $0 + $1.sizeBytes }
+    }
 
     func loadIfNeeded() async {
         guard !loaded, !isLoading else { return }
@@ -23,7 +47,6 @@ final class ReclaimableModel {
     }
 
     func refresh() async {
-        // Forget measurements for every listed location, then re-measure.
         for item in items {
             await SizeCache.shared.invalidate(subtree: item.path)
         }
@@ -34,6 +57,8 @@ final class ReclaimableModel {
     /// Returns the ledger description, or throws.
     func clear(_ item: ReclaimableItem) async throws -> String {
         try TrashAction.moveToTrash(path: item.path)
+        generation += 1                       // invalidate any in-flight build
+        Mutations.shared.bump()               // tell Descend to drop stale sizes
         await SizeCache.shared.invalidate(subtree: item.path)
         await SizeCache.shared.flush()
         items.removeAll { $0.id == item.id }
@@ -49,12 +74,15 @@ final class ReclaimableModel {
 
     private func build() async {
         isLoading = true
+        let gen = generation
+        var result: [ReclaimableItem] = []
         if let registry = try? RulesRegistry.bundled() {
-            let index = ReclaimableIndex(registry: registry)
-            items = await index.build()
+            result = await ReclaimableIndex(registry: registry).build()
         }
+        // A clear landed while we were measuring — discard the stale snapshot.
+        guard gen == generation else { isLoading = false; return }
+        items = result
         isLoading = false
-        // Keep the widget's reclaimable number current.
         if let accounting = try? DiskAccounting.measure() {
             WidgetBridge.export(accounting: accounting, reclaimable: grandTotal)
         }
@@ -125,15 +153,21 @@ struct CachesView: View {
                         StatStrip(columns: [
                             .init(
                                 label: "Free to clear",
-                                value: (model.totals[.cache] ?? 0).bytesFormatted,
+                                value: model.freeToClearBytes.bytesFormatted,
                                 caption: "Pure caches — clearing costs nothing.",
                                 tint: Theme.tierCache
                             ),
                             .init(
                                 label: "If you rebuild",
-                                value: (model.totals[.regenerable] ?? 0).bytesFormatted,
+                                value: model.regenerableBytes.bytesFormatted,
                                 caption: "Build artifacts and dependencies — one install away.",
                                 tint: Theme.tierRegenerable
+                            ),
+                            .init(
+                                label: "Review first",
+                                value: model.sensitiveBytes.bytesFormatted,
+                                caption: "Convention caches that may hold logins — check before clearing.",
+                                tint: Theme.tierData
                             ),
                         ])
                         tierSection(.cache, label: "Free to clear", caption: "regenerates itself — zero cost")
@@ -163,7 +197,11 @@ struct CachesView: View {
             }
         } message: {
             if let item = pendingClear {
-                Text("\(item.rule.regeneration) Moved to Trash — recoverable until you empty it.")
+                if item.rule.sensitive {
+                    Text("⚠︎ This lives in a cache folder but may hold login sessions or other data you'd have to re-enter. \(item.rule.regeneration) Moved to Trash — recoverable until you empty it.")
+                } else {
+                    Text("\(item.rule.regeneration) Moved to Trash — recoverable until you empty it.")
+                }
             }
         }
     }
@@ -172,13 +210,22 @@ struct CachesView: View {
         pendingClear = nil
         Task {
             if let owner {
-                owner.terminate()
-                try? await Task.sleep(for: .seconds(1))
+                let quit = await RunningApps.quitAndWait(owner)
+                if !quit {
+                    clearError = "\(owner.localizedName ?? "The app") is still running — clear aborted so its cache isn't half-rewritten. Quit it and retry."
+                    return
+                }
             }
             do {
                 lastAction = try await model.clear(item)
                 clearError = nil
             } catch {
+                // F-009: failures are recorded, not just shown.
+                await LedgerStore.shared.append(LedgerEvent(
+                    kind: .cleared,
+                    title: "Clear failed: \(item.rule.title)",
+                    detail: error.localizedDescription
+                ))
                 clearError = "Couldn't clear \(item.rule.title): \(error.localizedDescription)"
             }
         }
@@ -225,13 +272,18 @@ private struct ReclaimableRow: View {
     var body: some View {
         HStack(spacing: 12) {
             IconTile(
-                symbol: item.rule.tier == .cache ? "leaf" : "hammer",
-                tint: item.rule.tier.color,
+                symbol: item.rule.sensitive ? "exclamationmark.shield" : (item.rule.tier == .cache ? "leaf" : "hammer"),
+                tint: item.rule.sensitive ? Theme.tierData : item.rule.tier.color,
                 size: 26
             )
             VStack(alignment: .leading, spacing: 1) {
-                Text(item.rule.title)
-                    .font(.system(size: 13, weight: .medium))
+                HStack(spacing: 6) {
+                    Text(item.rule.title)
+                        .font(.system(size: 13, weight: .medium))
+                    if item.rule.sensitive {
+                        TierBadge(label: "Review", color: Theme.tierData)
+                    }
+                }
                 Text(abbreviatedPath)
                     .font(.system(size: 10.5))
                     .foregroundStyle(.tertiary)

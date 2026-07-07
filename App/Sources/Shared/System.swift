@@ -7,6 +7,20 @@ enum RunningApps {
     static func app(bundleID: String) -> NSRunningApplication? {
         NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == bundleID }
     }
+
+    /// Terminates an app and waits until it has actually exited, polling
+    /// `isTerminated` rather than guessing with a fixed sleep (F-008). Returns
+    /// true if the app is gone; false if it didn't quit within the timeout, so
+    /// the caller can abort rather than clear a cache the app is still writing.
+    static func quitAndWait(_ app: NSRunningApplication, timeout: Duration = .seconds(6)) async -> Bool {
+        app.terminate()
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        while ContinuousClock.now < deadline {
+            if app.isTerminated { return true }
+            try? await Task.sleep(for: .milliseconds(150))
+        }
+        return app.isTerminated
+    }
 }
 
 /// Shares the honest numbers with the widget via the App Group container.

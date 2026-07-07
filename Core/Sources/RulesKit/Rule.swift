@@ -15,6 +15,11 @@ public struct Rule: Codable, Sendable, Identifiable, Hashable {
     public let match: Match
     /// If set, this app should be quit before clearing (it holds the cache).
     public let ownerAppBundleID: String?
+    /// A generic/convention match that can contain login sessions or other
+    /// data the caption can't promise is safe (e.g. a browser profile living
+    /// under `~/.cache`). Sensitive items are shown for review, warned about
+    /// before clearing, and never counted as "zero cost" (F-004).
+    public let sensitive: Bool
 
     public struct Match: Codable, Sendable, Hashable {
         public enum Kind: String, Codable, Sendable {
@@ -46,7 +51,7 @@ public struct Rule: Codable, Sendable, Identifiable, Hashable {
         }
     }
 
-    public init(id: String, title: String, explanation: String, regeneration: String, tier: Tier, match: Match, ownerAppBundleID: String? = nil) {
+    public init(id: String, title: String, explanation: String, regeneration: String, tier: Tier, match: Match, ownerAppBundleID: String? = nil, sensitive: Bool = false) {
         self.id = id
         self.title = title
         self.explanation = explanation
@@ -54,5 +59,22 @@ public struct Rule: Codable, Sendable, Identifiable, Hashable {
         self.tier = tier
         self.match = match
         self.ownerAppBundleID = ownerAppBundleID
+        self.sensitive = sensitive
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, explanation, regeneration, tier, match, ownerAppBundleID, sensitive
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        explanation = try c.decode(String.self, forKey: .explanation)
+        regeneration = try c.decode(String.self, forKey: .regeneration)
+        tier = try c.decode(Tier.self, forKey: .tier)
+        match = try c.decode(Match.self, forKey: .match)
+        ownerAppBundleID = try c.decodeIfPresent(String.self, forKey: .ownerAppBundleID)
+        sensitive = try c.decodeIfPresent(Bool.self, forKey: .sensitive) ?? false
     }
 }

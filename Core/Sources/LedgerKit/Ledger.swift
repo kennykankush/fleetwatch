@@ -40,6 +40,7 @@ public actor LedgerStore {
 
     private let fileURL: URL
     private var cached: [LedgerEvent]?
+    private var loaded = false
 
     public init(fileURL: URL? = nil) {
         if let fileURL {
@@ -53,15 +54,38 @@ public actor LedgerStore {
     }
 
     public func events() -> [LedgerEvent] {
-        if let cached { return cached }
-        guard let data = try? Data(contentsOf: fileURL),
-              let events = try? Self.decoder.decode([LedgerEvent].self, from: data)
-        else {
-            cached = []
-            return []
+        loadIfNeeded()
+        return cached ?? []
+    }
+
+    /// Loads once. A file that exists but won't decode is QUARANTINED, never
+    /// wiped — the corrupt bytes are moved aside so the next append writes a
+    /// fresh file without destroying recoverable history (F-002).
+    private func loadIfNeeded() {
+        guard !loaded else { return }
+        loaded = true
+        guard let data = try? Data(contentsOf: fileURL) else {
+            cached = []   // absent file — a clean first run, nothing to preserve
+            return
         }
-        cached = events
-        return events
+        if let events = try? Self.decoder.decode([LedgerEvent].self, from: data) {
+            cached = events
+        } else {
+            quarantineCorruptFile()
+            cached = []
+        }
+    }
+
+    private func quarantineCorruptFile() {
+        let fm = FileManager.default
+        let stamp = Int(Date.now.timeIntervalSince1970)
+        var dest = fileURL.deletingPathExtension().appendingPathExtension("corrupt-\(stamp).json")
+        var n = 1
+        while fm.fileExists(atPath: dest.path) {
+            dest = fileURL.deletingPathExtension().appendingPathExtension("corrupt-\(stamp)-\(n).json")
+            n += 1
+        }
+        try? fm.moveItem(at: fileURL, to: dest)
     }
 
     @discardableResult

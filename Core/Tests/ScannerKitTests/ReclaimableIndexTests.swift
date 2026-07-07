@@ -43,12 +43,14 @@ struct ReclaimableIndexTests {
         let paths = Set(items.map(\.path))
 
         #expect(paths.contains(home.appending(path: ".npm").path))
-        #expect(paths.contains(home.appending(path: "Library/Caches").path))
         #expect(paths.contains(home.appending(path: "dev/webapp/node_modules").path))
         // The impostor node_modules (no package.json) is user data — absent.
         #expect(!paths.contains(home.appending(path: "dev/photos/node_modules").path))
-        // The Spotify cache is INSIDE Library/Caches — deduped, never counted twice.
-        #expect(!paths.contains(home.appending(path: "Library/Caches/com.spotify.client").path))
+        // F-004: the wholesale ~/Library/Caches rule was removed — the app
+        // never offers to trash the entire cache dir. Only the specific,
+        // known Spotify cache inside it is surfaced.
+        #expect(!paths.contains(home.appending(path: "Library/Caches").path))
+        #expect(paths.contains(home.appending(path: "Library/Caches/com.spotify.client").path))
     }
 
     @Test("Totals aggregate by tier and sizes are real")
