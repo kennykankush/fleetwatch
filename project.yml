@@ -10,6 +10,29 @@ packages:
     path: Core
 
 targets:
+  StockpileWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - Widget/Sources
+    info:
+      path: Widget/Info.plist
+      properties:
+        CFBundleDisplayName: Stockpile
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hadimulia.stockpile.widget
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_ENTITLEMENTS: Widget/StockpileWidget.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        SKIP_INSTALL: YES
+
   Stockpile:
     type: application
     platform: macOS
@@ -22,6 +45,8 @@ targets:
           - ScannerKit
           - InventoryKit
           - LedgerKit
+      - target: StockpileWidget
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.hadimulia.stockpile

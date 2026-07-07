@@ -54,6 +54,10 @@ final class ReclaimableModel {
             items = await index.build()
         }
         isLoading = false
+        // Keep the widget's reclaimable number current.
+        if let accounting = try? DiskAccounting.measure() {
+            WidgetBridge.export(accounting: accounting, reclaimable: grandTotal)
+        }
     }
 }
 
