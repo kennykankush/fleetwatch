@@ -2,12 +2,34 @@ import SwiftUI
 import AppKit
 import InventoryKit
 import ScannerKit
+import LedgerKit
+
+/// A staged uninstall: the app plus what we found scattered around.
+struct UninstallPlan: Identifiable {
+    var id: String { app.id }
+    let app: InstalledApp
+    let leftovers: [Leftover]
+
+    var totalBytes: Int64 {
+        (app.sizeBytes ?? 0) + leftovers.reduce(0) { $0 + $1.sizeBytes }
+    }
+
+    var methodDescription: String {
+        switch app.source {
+        case .homebrewCask: "via brew uninstall --zap (then leftover sweep)"
+        case .homebrewFormula: "via brew uninstall"
+        case .appStore, .direct: "app + leftovers to Trash — recoverable"
+        }
+    }
+}
 
 /// The totality of installed software, categorized by where it came from —
 /// because the source determines the correct uninstall path.
 struct AppsView: View {
     @State private var model = AppsModel()
     @State private var filter: SourceFilter = .all
+    @State private var plan: UninstallPlan?
+    @State private var banner: (message: String, isError: Bool)?
 
     enum SourceFilter: String, CaseIterable, Identifiable {
         case all = "All"
@@ -40,6 +62,23 @@ struct AppsView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(spacing: 0) {
+                    if let banner {
+                        HStack(spacing: 10) {
+                            Image(systemName: banner.isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                                .foregroundStyle(banner.isError ? Theme.tierRegenerable : Theme.tierCache)
+                            Text(banner.message)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Dismiss") { self.banner = nil }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 10)
+                        Divider().overlay(Theme.hairline)
+                    }
                     tableHeader
                     Divider().overlay(Theme.hairline)
                     appList
@@ -47,6 +86,62 @@ struct AppsView: View {
             }
         }
         .task { await model.load() }
+        .confirmationDialog(
+            plan.map { "Uninstall \($0.app.name)? (\($0.totalBytes.bytesFormatted) total)" } ?? "",
+            isPresented: Binding(get: { plan != nil }, set: { if !$0 { plan = nil } }),
+            titleVisibility: .visible
+        ) {
+            if let plan {
+                if let id = plan.app.bundleIdentifier, let running = RunningApps.app(bundleID: id) {
+                    Button("Quit & Uninstall", role: .destructive) {
+                        perform(plan, quitting: running)
+                    }
+                } else {
+                    Button("Uninstall", role: .destructive) {
+                        perform(plan, quitting: nil)
+                    }
+                }
+                Button("Cancel", role: .cancel) { self.plan = nil }
+            }
+        } message: {
+            if let plan {
+                Text("\(plan.methodDescription). Found \(plan.leftovers.count) leftover location\(plan.leftovers.count == 1 ? "" : "s") (\(plan.leftovers.reduce(0) { $0 + $1.sizeBytes }.bytesFormatted)) — swept too.")
+            }
+        }
+    }
+
+    private func stage(_ app: InstalledApp) {
+        Task {
+            let leftovers = await Task.detached(priority: .userInitiated) {
+                LeftoverLocator.find(bundleIdentifier: app.bundleIdentifier, appName: app.name)
+            }.value
+            plan = UninstallPlan(app: app, leftovers: leftovers)
+        }
+    }
+
+    private func perform(_ plan: UninstallPlan, quitting owner: NSRunningApplication?) {
+        self.plan = nil
+        Task {
+            if let owner {
+                owner.terminate()
+                try? await Task.sleep(for: .seconds(1))
+            }
+            do {
+                let description = try await Task.detached(priority: .userInitiated) {
+                    try UninstallAction.uninstall(plan.app, leftovers: plan.leftovers, brew: .local())
+                }.value
+                await LedgerStore.shared.append(LedgerEvent(
+                    kind: .cleared,
+                    title: "Uninstalled \(plan.app.name)",
+                    detail: description,
+                    bytes: plan.totalBytes
+                ))
+                model.apps.removeAll { $0.id == plan.app.id }
+                banner = (message: "\(description) — \(plan.totalBytes.bytesFormatted) freed.", isError: false)
+            } catch {
+                banner = (message: "Couldn't uninstall \(plan.app.name): \(error.localizedDescription)", isError: true)
+            }
+        }
     }
 
     private var tableHeader: some View {
@@ -121,7 +216,7 @@ struct AppsView: View {
         ScrollView {
             LazyVStack(spacing: 2) {
                 ForEach(filtered) { app in
-                    AppRow(app: app)
+                    AppRow(app: app) { stage(app) }
                 }
             }
             .padding(.horizontal, 28)
@@ -133,6 +228,7 @@ struct AppsView: View {
 
 private struct AppRow: View {
     let app: InstalledApp
+    let onUninstall: () -> Void
 
     var body: some View {
         HoverRow { hovering in
@@ -182,6 +278,16 @@ private struct AppRow: View {
             .font(.system(size: 13, weight: .semibold, design: .rounded))
             .monospacedDigit()
             .frame(width: 80, alignment: .trailing)
+
+            Button(action: onUninstall) {
+                Image(systemName: "trash")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(hovering ? Theme.tierData : .clear)
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(Pressable())
+            .disabled(!hovering)
+            .help("Uninstall — the correct way for its source, leftovers swept")
         }
         }
     }

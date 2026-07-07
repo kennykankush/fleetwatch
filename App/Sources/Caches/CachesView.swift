@@ -1,6 +1,7 @@
 import SwiftUI
 import ScannerKit
 import RulesKit
+import LedgerKit
 
 /// Shared reclaimable state — built once, observed by Overview and Caches.
 @MainActor
@@ -29,6 +30,23 @@ final class ReclaimableModel {
         await build()
     }
 
+    /// The core promise: move to Trash, record it, forget the measurement.
+    /// Returns the ledger description, or throws.
+    func clear(_ item: ReclaimableItem) async throws -> String {
+        try TrashAction.moveToTrash(path: item.path)
+        await SizeCache.shared.invalidate(subtree: item.path)
+        await SizeCache.shared.flush()
+        items.removeAll { $0.id == item.id }
+        let description = "\(item.rule.title) (\(item.sizeBytes.bytesFormatted)) moved to Trash — recoverable. \(item.rule.regeneration)"
+        await LedgerStore.shared.append(LedgerEvent(
+            kind: .cleared,
+            title: "Cleared \(item.rule.title)",
+            detail: description,
+            bytes: item.sizeBytes
+        ))
+        return description
+    }
+
     private func build() async {
         isLoading = true
         if let registry = try? RulesRegistry.bundled() {
@@ -43,6 +61,9 @@ final class ReclaimableModel {
 /// found for you — no descending required.
 struct CachesView: View {
     @State private var model = ReclaimableModel.shared
+    @State private var pendingClear: ReclaimableItem?
+    @State private var lastAction: String?
+    @State private var clearError: String?
 
     var body: some View {
         Screen(
@@ -56,6 +77,38 @@ struct CachesView: View {
         ) {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.sectionGap) {
+                    if let lastAction {
+                        Card(padding: 14) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(Theme.tierCache)
+                                Text(lastAction)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Button("Dismiss") { self.lastAction = nil }
+                                    .buttonStyle(.plain)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+                    if let clearError {
+                        Card(padding: 14) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(Theme.tierRegenerable)
+                                Text(clearError)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Button("Dismiss") { self.clearError = nil }
+                                    .buttonStyle(.plain)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
                     if model.isLoading && model.items.isEmpty {
                         VStack(spacing: 12) {
                             ProgressView()
@@ -87,6 +140,44 @@ struct CachesView: View {
             }
         }
         .task { await model.loadIfNeeded() }
+        .confirmationDialog(
+            pendingClear.map { "Clear \($0.rule.title)? (\($0.sizeBytes.bytesFormatted))" } ?? "",
+            isPresented: Binding(get: { pendingClear != nil }, set: { if !$0 { pendingClear = nil } }),
+            titleVisibility: .visible
+        ) {
+            if let item = pendingClear {
+                if let owner = item.rule.ownerAppBundleID, let running = RunningApps.app(bundleID: owner) {
+                    Button("Quit \(running.localizedName ?? "app") & Clear", role: .destructive) {
+                        perform(item, quitting: running)
+                    }
+                } else {
+                    Button("Move to Trash", role: .destructive) {
+                        perform(item, quitting: nil)
+                    }
+                }
+                Button("Cancel", role: .cancel) { pendingClear = nil }
+            }
+        } message: {
+            if let item = pendingClear {
+                Text("\(item.rule.regeneration) Moved to Trash — recoverable until you empty it.")
+            }
+        }
+    }
+
+    private func perform(_ item: ReclaimableItem, quitting owner: NSRunningApplication?) {
+        pendingClear = nil
+        Task {
+            if let owner {
+                owner.terminate()
+                try? await Task.sleep(for: .seconds(1))
+            }
+            do {
+                lastAction = try await model.clear(item)
+                clearError = nil
+            } catch {
+                clearError = "Couldn't clear \(item.rule.title): \(error.localizedDescription)"
+            }
+        }
     }
 
     @ViewBuilder
@@ -102,7 +193,7 @@ struct CachesView: View {
                             ReclaimableRow(
                                 item: item,
                                 fractionOfLargest: largest > 0 ? Double(item.sizeBytes) / Double(largest) : 0
-                            )
+                            ) { pendingClear = item }
                             if index < items.count - 1 {
                                 Divider().overlay(Theme.hairline).padding(.leading, 50)
                             }
@@ -117,6 +208,7 @@ struct CachesView: View {
 private struct ReclaimableRow: View {
     let item: ReclaimableItem
     let fractionOfLargest: Double
+    let onClear: () -> Void
     @State private var hovering = false
 
     private var abbreviatedPath: String {
@@ -154,6 +246,16 @@ private struct ReclaimableRow: View {
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .frame(width: 76, alignment: .trailing)
+
+            Button(action: onClear) {
+                Image(systemName: "trash")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(hovering ? Theme.tierData : Color.white.opacity(0.15))
+                    .frame(width: 24, height: 24)
+                    .background(hovering ? Theme.surface2 : .clear, in: RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(Pressable())
+            .help("Move to Trash — recoverable")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

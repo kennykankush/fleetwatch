@@ -15,6 +15,7 @@ struct OverviewView: View {
     @State private var accounting: DiskAccounting?
     @State private var loadError: String?
     @State private var reclaimable = ReclaimableModel.shared
+    @State private var previousSnapshot: LedgerEvent?
 
     var body: some View {
         Screen(
@@ -27,6 +28,7 @@ struct OverviewView: View {
 
                     if let accounting {
                         CapacityHero(accounting: accounting)
+                        diffLine(accounting)
                         reclaimableStrip
                     } else if let loadError {
                         Card {
@@ -73,11 +75,41 @@ struct OverviewView: View {
         }
     }
 
+    /// "Since <last snapshot>: physical +X · purgeable −Y" — the ledger
+    /// talking back. Only shown when a previous snapshot carries metrics.
+    @ViewBuilder
+    private func diffLine(_ a: DiskAccounting) -> some View {
+        if let prev = previousSnapshot, let m = prev.metrics,
+           let prevPhysical = m["physicalUsed"], let prevPurgeable = m["purgeable"] {
+            HStack(spacing: 6) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                Text("Since \(prev.date, format: .relative(presentation: .named)):")
+                    .foregroundStyle(.secondary)
+                Text("physical \(signed(a.physicalUsed - prevPhysical))")
+                    .foregroundStyle(a.physicalUsed - prevPhysical > 0 ? Theme.tierRegenerable : Theme.tierCache)
+                Text("·").foregroundStyle(.tertiary)
+                Text("purgeable \(signed(a.purgeable - prevPurgeable))")
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .font(.system(size: 12))
+            .monospacedDigit()
+            .padding(.horizontal, 4)
+        }
+    }
+
+    private func signed(_ bytes: Int64) -> String {
+        bytes >= 0 ? "+\(bytes.bytesFormatted)" : "−\((-bytes).bytesFormatted)"
+    }
+
     private func load() async {
         Task { await reclaimable.loadIfNeeded() }
         do {
             let measured = try DiskAccounting.measure()
             accounting = measured
+            previousSnapshot = await LedgerStore.shared.latestSnapshot()
 
             if !AppRuntime.snapshotRecorded {
                 AppRuntime.snapshotRecorded = true
@@ -85,9 +117,15 @@ struct OverviewView: View {
                     kind: .snapshot,
                     title: "Disk snapshot",
                     detail: "\(measured.physicalUsed.bytesFormatted) physical · \(measured.effectiveUsed.bytesFormatted) effective · \(measured.purgeable.bytesFormatted) purgeable",
-                    bytes: measured.physicalUsed
+                    bytes: measured.physicalUsed,
+                    metrics: [
+                        "physicalUsed": measured.physicalUsed,
+                        "effectiveUsed": measured.effectiveUsed,
+                        "purgeable": measured.purgeable,
+                    ]
                 ))
             }
+            WidgetBridge.export(accounting: measured, reclaimable: reclaimable.grandTotal)
         } catch {
             loadError = "Couldn't measure the boot volume: \(error.localizedDescription)"
         }

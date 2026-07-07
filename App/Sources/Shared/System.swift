@@ -1,5 +1,47 @@
 import SwiftUI
 import ScannerKit
+import WidgetKit
+
+/// Who's running — the "quit Spotify before clearing its cache" guard.
+enum RunningApps {
+    static func app(bundleID: String) -> NSRunningApplication? {
+        NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == bundleID }
+    }
+}
+
+/// Shares the honest numbers with the widget via the App Group container.
+/// Harmless no-op until the group entitlement exists.
+enum WidgetBridge {
+    static let groupID = "483LU3J5WJ.com.hadimulia.stockpile"
+
+    struct Snapshot: Codable {
+        let date: Date
+        let physicalUsedFraction: Double
+        let effectiveUsedFraction: Double
+        let physicalFree: Int64
+        let purgeable: Int64
+        let reclaimable: Int64
+    }
+
+    static func export(accounting: DiskAccounting, reclaimable: Int64) {
+        guard let container = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: groupID
+        ) else { return }
+        let snapshot = Snapshot(
+            date: .now,
+            physicalUsedFraction: accounting.physicalUsedFraction,
+            effectiveUsedFraction: accounting.effectiveUsedFraction,
+            physicalFree: accounting.physicalFree,
+            purgeable: accounting.purgeable,
+            reclaimable: reclaimable
+        )
+        try? FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+        if let data = try? JSONEncoder().encode(snapshot) {
+            try? data.write(to: container.appending(path: "snapshot.json"), options: .atomic)
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
+}
 
 /// Permission state, probed — never assumed, never nagging.
 /// Ask once, deep-link once, respect the dismissal.

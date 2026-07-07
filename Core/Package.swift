@@ -23,7 +23,8 @@ let package = Package(
             dependencies: ["RulesKit"]
         ),
         .target(
-            name: "InventoryKit"
+            name: "InventoryKit",
+            dependencies: ["ScannerKit"]
         ),
         .testTarget(
             name: "RulesKitTests",

@@ -18,14 +18,17 @@ public struct LedgerEvent: Codable, Sendable, Identifiable, Hashable {
     public let detail: String
     /// Bytes involved, when meaningful (snapshot = physical used; cleared = freed).
     public let bytes: Int64?
+    /// Structured numbers for diffing between snapshots (older events: nil).
+    public let metrics: [String: Int64]?
 
-    public init(kind: Kind, title: String, detail: String, bytes: Int64? = nil) {
+    public init(kind: Kind, title: String, detail: String, bytes: Int64? = nil, metrics: [String: Int64]? = nil) {
         self.id = UUID()
         self.date = .now
         self.kind = kind
         self.title = title
         self.detail = detail
         self.bytes = bytes
+        self.metrics = metrics
     }
 }
 

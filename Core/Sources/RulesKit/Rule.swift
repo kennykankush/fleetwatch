@@ -13,6 +13,8 @@ public struct Rule: Codable, Sendable, Identifiable, Hashable {
     public let regeneration: String
     public let tier: Tier
     public let match: Match
+    /// If set, this app should be quit before clearing (it holds the cache).
+    public let ownerAppBundleID: String?
 
     public struct Match: Codable, Sendable, Hashable {
         public enum Kind: String, Codable, Sendable {
@@ -44,12 +46,13 @@ public struct Rule: Codable, Sendable, Identifiable, Hashable {
         }
     }
 
-    public init(id: String, title: String, explanation: String, regeneration: String, tier: Tier, match: Match) {
+    public init(id: String, title: String, explanation: String, regeneration: String, tier: Tier, match: Match, ownerAppBundleID: String? = nil) {
         self.id = id
         self.title = title
         self.explanation = explanation
         self.regeneration = regeneration
         self.tier = tier
         self.match = match
+        self.ownerAppBundleID = ownerAppBundleID
     }
 }

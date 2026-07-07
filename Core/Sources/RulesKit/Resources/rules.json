@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "rules": [
     {
       "id": "npm-cache",
@@ -54,7 +54,8 @@
       "match": {
         "kind": "homeRelativePath",
         "value": "Library/Caches/com.spotify.client"
-      }
+      },
+      "ownerAppBundleID": "com.spotify.client"
     },
     {
       "id": "xcode-previews",
