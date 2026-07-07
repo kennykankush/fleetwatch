@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 
 [ -z "$(git status --porcelain)" ] || { echo "error: working tree is dirty — commit first" >&2; exit 1; }
 
-VERSION=$(grep MARKETING_VERSION project.yml | awk '{print $2}' | tr -d '"')
+VERSION=$(grep -m1 MARKETING_VERSION project.yml | awk '{print $2}' | tr -d '"')
 if git rev-parse "v$VERSION" >/dev/null 2>&1 || gh release view "v$VERSION" >/dev/null 2>&1; then
     echo "error: v$VERSION already released — bump MARKETING_VERSION in project.yml" >&2
     exit 1

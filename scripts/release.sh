@@ -5,7 +5,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-VERSION=$(grep MARKETING_VERSION project.yml | awk '{print $2}' | tr -d '"')
+VERSION=$(grep -m1 MARKETING_VERSION project.yml | awk '{print $2}' | tr -d '"')
 BUILD_DIR="build"
 ARCHIVE="$BUILD_DIR/Stockpile.xcarchive"
 EXPORT_DIR="$BUILD_DIR/export"
