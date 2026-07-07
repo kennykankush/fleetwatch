@@ -1,0 +1,41 @@
+name: Stockpile
+options:
+  bundleIdPrefix: com.hadimulia
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+
+packages:
+  StockpileCore:
+    path: Core
+
+targets:
+  Stockpile:
+    type: application
+    platform: macOS
+    sources:
+      - App/Sources
+    dependencies:
+      - package: StockpileCore
+        products:
+          - RulesKit
+          - ScannerKit
+          - InventoryKit
+          - LedgerKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hadimulia.stockpile
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_ENTITLEMENTS: App/Stockpile.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 Hadi Mulia"
+        INFOPLIST_KEY_NSMainStoryboardFile: ""
+        COMBINE_HIDPI_IMAGES: YES
+        DEAD_CODE_STRIPPING: YES

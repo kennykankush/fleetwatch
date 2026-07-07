@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "npm-cache",
+      "title": "npm cache",
+      "explanation": "Downloaded package archives npm keeps so reinstalls are fast.",
+      "regeneration": "Rebuilds itself as you install packages. Zero cost.",
+      "tier": "cache",
+      "match": { "kind": "homeRelativePath", "value": ".npm" }
+    },
+    {
+      "id": "uv-cache",
+      "title": "uv cache",
+      "explanation": "Python package cache kept by the uv package manager.",
+      "regeneration": "Rebuilds itself on the next install. Zero cost.",
+      "tier": "cache",
+      "match": { "kind": "homeRelativePath", "value": ".cache/uv" }
+    },
+    {
+      "id": "pip-cache",
+      "title": "pip cache",
+      "explanation": "Downloaded wheel archives pip keeps for reinstalls.",
+      "regeneration": "Rebuilds itself on the next install. Zero cost.",
+      "tier": "cache",
+      "match": { "kind": "homeRelativePath", "value": "Library/Caches/pip" }
+    },
+    {
+      "id": "homebrew-cache",
+      "title": "Homebrew cache",
+      "explanation": "Downloaded bottles and old formula versions Homebrew keeps around.",
+      "regeneration": "Re-downloads on demand; `brew cleanup` does the same thing.",
+      "tier": "cache",
+      "match": { "kind": "homeRelativePath", "value": "Library/Caches/Homebrew" }
+    },
+    {
+      "id": "spotify-cache",
+      "title": "Spotify streaming cache",
+      "explanation": "Songs you streamed recently, kept locally so replaying is instant.",
+      "regeneration": "Rebuilds as you listen. Spotify should be quit before clearing.",
+      "tier": "cache",
+      "match": { "kind": "homeRelativePath", "value": "Library/Caches/com.spotify.client" }
+    },
+    {
+      "id": "xcode-previews",
+      "title": "Xcode Previews cache",
+      "explanation": "Build products Xcode keeps so SwiftUI previews start fast.",
+      "regeneration": "Rebuilds automatically; first preview afterwards is slower.",
+      "tier": "cache",
+      "match": { "kind": "homeRelativePath", "value": "Library/Developer/Xcode/UserData/Previews" }
+    },
+    {
+      "id": "playwright-browsers",
+      "title": "Playwright browsers",
+      "explanation": "Browser builds downloaded by the Playwright test framework.",
+      "regeneration": "Re-downloads on the next `playwright install`.",
+      "tier": "cache",
+      "match": { "kind": "homeRelativePath", "value": "Library/Caches/ms-playwright" }
+    },
+    {
+      "id": "puppeteer-browsers",
+      "title": "Puppeteer browsers",
+      "explanation": "Chromium builds downloaded by the Puppeteer library.",
+      "regeneration": "Re-downloads on the next install.",
+      "tier": "cache",
+      "match": { "kind": "homeRelativePath", "value": ".cache/puppeteer" }
+    },
+    {
+      "id": "electron-cache",
+      "title": "Electron build cache",
+      "explanation": "Electron binaries cached by dev tooling.",
+      "regeneration": "Re-downloads on the next build.",
+      "tier": "cache",
+      "match": { "kind": "homeRelativePath", "value": "Library/Caches/electron" }
+    },
+    {
+      "id": "zig-cache",
+      "title": "Zig compiler cache",
+      "explanation": "Incremental build artifacts kept by the Zig compiler.",
+      "regeneration": "Rebuilds on the next compile.",
+      "tier": "cache",
+      "match": { "kind": "homeRelativePath", "value": ".cache/zig" }
+    },
+    {
+      "id": "pycache",
+      "title": "Python bytecode cache",
+      "explanation": "Compiled bytecode Python drops beside source files.",
+      "regeneration": "Regenerates on the next run. Zero cost.",
+      "tier": "cache",
+      "match": { "kind": "directoryName", "value": "__pycache__" }
+    },
+    {
+      "id": "node-modules",
+      "title": "Node.js dependencies",
+      "explanation": "Installed packages for a JavaScript project.",
+      "regeneration": "Next `npm install` (or pnpm/yarn/bun) restores them from the lockfile.",
+      "tier": "regenerable",
+      "match": { "kind": "directoryName", "value": "node_modules", "requiresSibling": "package.json" }
+    },
+    {
+      "id": "swift-build",
+      "title": "Swift build directory",
+      "explanation": "Compiled artifacts from Swift Package Manager.",
+      "regeneration": "Next `swift build` recompiles from source.",
+      "tier": "regenerable",
+      "match": { "kind": "directoryName", "value": ".build", "requiresSibling": "Package.swift" }
+    },
+    {
+      "id": "rust-target",
+      "title": "Rust build directory",
+      "explanation": "Compiled artifacts from Cargo.",
+      "regeneration": "Next `cargo build` recompiles from source.",
+      "tier": "regenerable",
+      "match": { "kind": "directoryName", "value": "target", "requiresSibling": "Cargo.toml" }
+    },
+    {
+      "id": "nextjs-build",
+      "title": "Next.js build output",
+      "explanation": "Compiled pages and build cache for a Next.js project.",
+      "regeneration": "Next `next build` / dev server run regenerates it.",
+      "tier": "regenerable",
+      "match": { "kind": "directoryName", "value": ".next", "requiresSibling": "package.json" }
+    },
+    {
+      "id": "python-venv",
+      "title": "Python virtual environment",
+      "explanation": "An isolated Python environment with installed packages.",
+      "regeneration": "Recreate with `python -m venv` / `uv venv` and reinstall dependencies.",
+      "tier": "regenerable",
+      "match": { "kind": "directoryName", "value": ".venv", "requiresChild": "pyvenv.cfg" }
+    },
+    {
+      "id": "xcode-derived-data",
+      "title": "Xcode DerivedData",
+      "explanation": "Build products and indexes for every Xcode project you've opened.",
+      "regeneration": "Rebuilds on the next build of each project; first builds are slower.",
+      "tier": "regenerable",
+      "match": { "kind": "homeRelativePath", "value": "Library/Developer/Xcode/DerivedData" }
+    },
+    {
+      "id": "simulator-devices",
+      "title": "iOS Simulator devices",
+      "explanation": "Disk images for every simulator device Xcode has created.",
+      "regeneration": "Xcode recreates devices on demand; installed test apps are lost.",
+      "tier": "regenerable",
+      "match": { "kind": "homeRelativePath", "value": "Library/Developer/CoreSimulator/Devices" }
+    },
+    {
+      "id": "claude-vm-bundles",
+      "title": "Claude Desktop VM bundles",
+      "explanation": "Virtual machine images Claude Desktop uses for sandboxed sessions.",
+      "regeneration": "Re-downloads when a feature needs them.",
+      "tier": "regenerable",
+      "match": { "kind": "homeRelativePath", "value": "Library/Application Support/Claude/vm_bundles" }
+    }
+  ]
+}
