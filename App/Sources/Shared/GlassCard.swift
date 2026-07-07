@@ -142,6 +142,118 @@ struct StatTile: View {
     }
 }
 
+/// The screen chassis: a pinned header bar (title left, actions right) over
+/// a full-width hairline; content scrolls underneath. Every section uses it.
+struct Screen<Actions: View, Content: View>: View {
+    let title: String
+    var subtitle: String? = nil
+    @ViewBuilder var actions: () -> Actions
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 19, weight: .semibold))
+                        .tracking(-0.4)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                actions()
+            }
+            .padding(.horizontal, 28)
+            .padding(.top, 18)
+            .padding(.bottom, 14)
+
+            Divider().overlay(Theme.hairline)
+
+            content()
+        }
+    }
+}
+
+extension Screen where Actions == EmptyView {
+    init(title: String, subtitle: String? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.init(title: title, subtitle: subtitle, actions: { EmptyView() }, content: content)
+    }
+}
+
+/// A quiet pill button for header-bar actions.
+struct BarButton: View {
+    let label: String
+    let symbol: String
+    var disabled = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(label, systemImage: symbol)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 6)
+                .background(Theme.surface2, in: Capsule())
+                .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+    }
+}
+
+/// A single card of columns divided by vertical hairlines — the Linear
+/// "stat strip" that replaces a row of floating tiles.
+struct StatStrip: View {
+    struct Column: Identifiable {
+        var id: String { label }
+        let label: String
+        let value: String
+        let caption: String
+        let tint: Color
+    }
+
+    let columns: [Column]
+
+    var body: some View {
+        Card(padding: 0) {
+            HStack(spacing: 0) {
+                ForEach(Array(columns.enumerated()), id: \.element.id) { index, col in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Circle().fill(col.tint).frame(width: 6, height: 6)
+                            Text(col.label.uppercased())
+                                .font(.system(size: 10.5, weight: .semibold))
+                                .tracking(1.3)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(col.value)
+                            .font(.system(size: 25, weight: .semibold, design: .rounded))
+                            .tracking(-0.5)
+                            .monospacedDigit()
+                        Text(col.caption)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if index < columns.count - 1 {
+                        Rectangle()
+                            .fill(Theme.hairline)
+                            .frame(width: 1)
+                            .padding(.vertical, 14)
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// The unified list row chassis: bare on the canvas, hover lifts one surface
 /// step. Used by Descend, Apps, and any large list.
 struct HoverRow<Content: View>: View {

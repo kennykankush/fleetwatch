@@ -60,27 +60,26 @@ struct DescendView: View {
     @State private var model = DescendModel()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .center) {
+        VStack(spacing: 0) {
+            // The path bar IS the header — Finder-style.
+            HStack(alignment: .center, spacing: 12) {
                 breadcrumb
                 Spacer()
                 if let oldest = model.oldestMeasurement, !model.isScanning {
                     Text("measured \(oldest, format: .relative(presentation: .named))")
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
-                        .padding(.trailing, 8)
                 }
-                Button {
+                BarButton(label: "Refresh", symbol: "arrow.clockwise", disabled: model.isScanning) {
                     Task { await model.refresh() }
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                        .font(.callout)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .disabled(model.isScanning)
-                .help("Re-measure this folder")
+                .help("Re-measure this folder honestly")
             }
+            .padding(.horizontal, 28)
+            .padding(.top, 18)
+            .padding(.bottom, 14)
+
+            Divider().overlay(Theme.hairline)
 
             if model.isScanning {
                 VStack(spacing: 12) {
@@ -94,16 +93,18 @@ struct DescendView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let scanError = model.scanError {
-                Card {
-                    Label(scanError, systemImage: "lock")
-                        .foregroundStyle(Theme.tierRegenerable)
+                VStack {
+                    Card {
+                        Label(scanError, systemImage: "lock")
+                            .foregroundStyle(Theme.tierRegenerable)
+                    }
+                    .padding(28)
+                    Spacer()
                 }
-                Spacer()
             } else {
                 entryList
             }
         }
-        .padding(Theme.pagePadding)
         .task(id: model.current) { await model.show(model.current) }
     }
 
@@ -133,7 +134,8 @@ struct DescendView: View {
                     model.path = Array(model.path.prefix(index + 1))
                 } label: {
                     Text(url.lastPathComponent.isEmpty ? "/" : url.lastPathComponent)
-                        .font(.system(size: 19, weight: index == model.path.count - 1 ? .semibold : .regular))
+                        .font(.system(size: 17, weight: index == model.path.count - 1 ? .semibold : .regular))
+                        .tracking(-0.3)
                         .foregroundStyle(index == model.path.count - 1 ? .primary : .secondary)
                 }
                 .buttonStyle(.plain)
@@ -143,7 +145,7 @@ struct DescendView: View {
 
     private var entryList: some View {
         ScrollView {
-            LazyVStack(spacing: 4) {
+            LazyVStack(spacing: 2) {
                 let largest = model.entries.first?.sizeBytes ?? 1
                 ForEach(model.entries) { entry in
                     EntryRow(
@@ -156,6 +158,8 @@ struct DescendView: View {
                     }
                 }
             }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 12)
         }
         .scrollIndicators(.hidden)
     }

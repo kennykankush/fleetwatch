@@ -20,13 +20,12 @@ struct LedgerView: View {
     }
 
     var body: some View {
+        Screen(
+            title: "Ledger",
+            subtitle: "Every snapshot and every action, recorded. Storage with a memory."
+        ) {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.sectionGap) {
-                PageHeader(
-                    title: "Ledger",
-                    subtitle: "Every snapshot and every action, recorded. Storage with a memory."
-                )
-
                 if !loaded {
                     ProgressView()
                         .frame(maxWidth: .infinity, minHeight: 200)
@@ -58,7 +57,8 @@ struct LedgerView: View {
                     }
                 }
             }
-            .padding(Theme.pagePadding)
+            .padding(28)
+        }
         }
         .task {
             events = await LedgerStore.shared.events()

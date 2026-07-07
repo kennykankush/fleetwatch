@@ -10,26 +10,26 @@ struct StartupView: View {
     @State private var pendingAction: StartupItem?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Theme.sectionGap) {
-                PageHeader(
-                    title: "Startup",
-                    subtitle: "Login items, agents, and daemons — and what each one actually runs."
-                )
-
-                if model.isLoading {
-                    ProgressView("Reading launchd…")
-                        .frame(maxWidth: .infinity, minHeight: 200)
-                } else {
-                    ForEach(StartupItem.Kind.allCases, id: \.self) { kind in
-                        let items = model.items.filter { $0.kind == kind }
-                        if !items.isEmpty {
-                            section(kind: kind, items: items)
+        Screen(
+            title: "Startup",
+            subtitle: "Login items, agents, and daemons — and what each one actually runs."
+        ) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.sectionGap) {
+                    if model.isLoading {
+                        ProgressView("Reading launchd…")
+                            .frame(maxWidth: .infinity, minHeight: 200)
+                    } else {
+                        ForEach(StartupItem.Kind.allCases, id: \.self) { kind in
+                            let items = model.items.filter { $0.kind == kind }
+                            if !items.isEmpty {
+                                section(kind: kind, items: items)
+                            }
                         }
                     }
                 }
+                .padding(28)
             }
-            .padding(Theme.pagePadding)
         }
         .task { await model.load() }
         .confirmationDialog(

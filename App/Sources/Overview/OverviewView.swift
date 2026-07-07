@@ -9,79 +9,67 @@ enum AppRuntime {
     static var snapshotRecorded = false
 }
 
-/// The honest numbers. Both accountings, side by side, always.
+/// The honest numbers: one protagonist numeral, a metric stack beside it,
+/// and the reclaimable strip below. Both accountings, always.
 struct OverviewView: View {
     @State private var accounting: DiskAccounting?
     @State private var loadError: String?
     @State private var reclaimable = ReclaimableModel.shared
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Theme.sectionGap) {
-                PageHeader(
-                    title: "Your disk, honestly.",
-                    subtitle: "Two accountings of the same volume — physical bytes, and what's effectively yours."
-                )
+        Screen(
+            title: "Overview",
+            subtitle: "Your disk, honestly — physical bytes and what's effectively yours."
+        ) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    SetupCard()
 
-                SetupCard()
-
-                if let accounting {
-                    CapacityHero(accounting: accounting)
-                    statGrid(accounting)
-                    tierLegend
-                } else if let loadError {
-                    Card {
-                        Label(loadError, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(Theme.tierRegenerable)
+                    if let accounting {
+                        CapacityHero(accounting: accounting)
+                        reclaimableStrip
+                    } else if let loadError {
+                        Card {
+                            Label(loadError, systemImage: "exclamationmark.triangle")
+                                .foregroundStyle(Theme.tierRegenerable)
+                        }
+                    } else {
+                        ProgressView("Measuring…")
+                            .frame(maxWidth: .infinity, minHeight: 240)
                     }
-                } else {
-                    ProgressView("Measuring…")
-                        .frame(maxWidth: .infinity, minHeight: 240)
                 }
+                .padding(28)
             }
-            .padding(Theme.pagePadding)
         }
         .task { await load() }
     }
 
-    private func statGrid(_ a: DiskAccounting) -> some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 3), spacing: 14) {
-            StatTile(
-                symbol: "arrow.3.trianglepath",
-                tint: Theme.purgeable,
-                label: "Purgeable",
-                value: a.purgeable.bytesFormatted,
-                caption: "macOS reclaims this automatically the moment space runs low."
+    private var reclaimableStrip: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionLabel(
+                text: "Reclaimable",
+                trailing: reclaimable.items.isEmpty ? "finding recognized locations…" : "across \(reclaimable.items.count) locations — see Caches"
             )
-            StatTile(
-                symbol: "internaldrive",
-                tint: Theme.accent,
-                label: "Strictly free",
-                value: a.physicalFree.bytesFormatted,
-                caption: "Untouched space — the df-style number."
-            )
-            StatTile(
-                symbol: "leaf",
-                tint: Theme.tierCache,
-                label: "Reclaimable",
-                value: reclaimable.isLoading || reclaimable.items.isEmpty
-                    ? "…"
-                    : reclaimable.grandTotal.bytesFormatted,
-                caption: reclaimable.items.isEmpty
-                    ? "Finding recognized locations…"
-                    : "Across \(reclaimable.items.count) recognized locations — see Caches."
-            )
-        }
-    }
-
-    private var tierLegend: some View {
-        Card(padding: 16) {
-            HStack(spacing: 26) {
-                LegendDot(color: Theme.tierCache, label: "Cache", detail: "regenerates itself")
-                LegendDot(color: Theme.tierRegenerable, label: "Regenerable", detail: "costs a rebuild")
-                LegendDot(color: Theme.tierData, label: "Your data", detail: "never suggested")
-                Spacer()
-            }
+            StatStrip(columns: [
+                .init(
+                    label: "Total",
+                    value: reclaimable.items.isEmpty ? "…" : reclaimable.grandTotal.bytesFormatted,
+                    caption: "Everything the registry recognizes as safe to let go.",
+                    tint: Theme.accent
+                ),
+                .init(
+                    label: "Free to clear",
+                    value: reclaimable.items.isEmpty ? "…" : (reclaimable.totals[.cache] ?? 0).bytesFormatted,
+                    caption: "Pure caches — they rebuild themselves. Zero cost.",
+                    tint: Theme.tierCache
+                ),
+                .init(
+                    label: "If you rebuild",
+                    value: reclaimable.items.isEmpty ? "…" : (reclaimable.totals[.regenerable] ?? 0).bytesFormatted,
+                    caption: "Dependencies and build artifacts — one install away.",
+                    tint: Theme.tierRegenerable
+                ),
+            ])
         }
     }
 
@@ -106,35 +94,54 @@ struct OverviewView: View {
     }
 }
 
-/// The hero: two honest numbers over one segmented capacity bar.
+/// Asymmetric editorial hero: the protagonist numeral left, a hairline-
+/// divided metric stack right, the capacity bar spanning underneath.
 private struct CapacityHero: View {
     let accounting: DiskAccounting
 
     var body: some View {
         HeroCard {
-            VStack(alignment: .leading, spacing: 22) {
-                HStack(alignment: .firstTextBaseline, spacing: 56) {
-                    bigNumber(
-                        label: "Physical",
-                        fraction: accounting.physicalUsedFraction,
-                        detail: "\(accounting.physicalUsed.bytesFormatted) on disk",
-                        tint: Theme.accent
-                    )
-                    bigNumber(
-                        label: "Effective",
-                        fraction: accounting.effectiveUsedFraction,
-                        detail: "\(accounting.effectiveUsed.bytesFormatted) after purgeable",
-                        tint: Theme.purgeable
-                    )
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 3) {
-                        Text(accounting.totalCapacity.bytesFormatted)
-                            .font(.system(.title3, design: .rounded).weight(.semibold))
+            VStack(alignment: .leading, spacing: 26) {
+                HStack(alignment: .top, spacing: 0) {
+                    // Protagonist: physical usage — the real bytes.
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 7) {
+                            RoundedRectangle(cornerRadius: 1.5)
+                                .fill(Theme.accent)
+                                .frame(width: 3, height: 11)
+                            Text("PHYSICAL — BYTES ON DISK")
+                                .font(.system(size: 11, weight: .semibold))
+                                .tracking(1.4)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(accounting.physicalUsedFraction, format: .percent.precision(.fractionLength(0)))
+                            .font(.system(size: 96, weight: .semibold, design: .rounded))
+                            .tracking(-4)
                             .monospacedDigit()
-                        Text("total capacity")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                        Text("\(accounting.physicalUsed.bytesFormatted) of \(accounting.totalCapacity.bytesFormatted)")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
                     }
+
+                    Spacer(minLength: 40)
+
+                    // Metric stack: the second accounting and its parts.
+                    VStack(spacing: 0) {
+                        metricRow("Effective used", accounting.effectiveUsed.bytesFormatted,
+                                  percent: accounting.effectiveUsedFraction, tint: Theme.purgeable)
+                        Divider().overlay(Theme.hairline)
+                        metricRow("Purgeable", accounting.purgeable.bytesFormatted,
+                                  hint: "auto-reclaimed by macOS", tint: Theme.purgeable.opacity(0.55))
+                        Divider().overlay(Theme.hairline)
+                        metricRow("Strictly free", accounting.physicalFree.bytesFormatted,
+                                  hint: "the df-style number", tint: .white.opacity(0.35))
+                        Divider().overlay(Theme.hairline)
+                        metricRow("Effectively free", (accounting.physicalFree + accounting.purgeable).bytesFormatted,
+                                  hint: "what Finder calls available", tint: Theme.accent.opacity(0.7))
+                    }
+                    .frame(width: 300)
+                    .padding(.top, 4)
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
@@ -150,26 +157,30 @@ private struct CapacityHero: View {
         }
     }
 
-    private func bigNumber(label: String, fraction: Double, detail: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 7) {
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(tint)
-                    .frame(width: 3, height: 11)
-                Text(label.uppercased())
-                    .font(.system(size: 11, weight: .semibold))
-                    .tracking(1.4)
-                    .foregroundStyle(.secondary)
+    private func metricRow(_ label: String, _ value: String, percent: Double? = nil, hint: String? = nil, tint: Color) -> some View {
+        HStack(spacing: 8) {
+            Circle().fill(tint).frame(width: 6, height: 6)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(label)
+                    .font(.system(size: 12, weight: .medium))
+                if let hint {
+                    Text(hint)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.tertiary)
+                }
             }
-            Text(fraction, format: .percent.precision(.fractionLength(0)))
-                .font(.system(size: 62, weight: .semibold, design: .rounded))
-                .tracking(-2)
-                .monospacedDigit()
-            Text(detail)
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+            Spacer()
+            if let percent {
+                Text(percent, format: .percent.precision(.fractionLength(0)))
+                    .font(.system(size: 12, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Text(value)
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .monospacedDigit()
         }
+        .padding(.vertical, 10)
     }
 
     private var capacityBar: some View {

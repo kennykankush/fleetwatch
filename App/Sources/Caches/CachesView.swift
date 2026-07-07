@@ -45,61 +45,48 @@ struct CachesView: View {
     @State private var model = ReclaimableModel.shared
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Theme.sectionGap) {
-                HStack(alignment: .top) {
-                    PageHeader(
-                        title: "Caches",
-                        subtitle: "Every reclaimable location the registry recognizes — found, sized, and explained."
-                    )
-                    Spacer()
-                    Button {
-                        Task { await model.refresh() }
-                    } label: {
-                        Label("Refresh", systemImage: "arrow.clockwise")
-                            .font(.callout)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    .disabled(model.isLoading)
-                }
-
-                if model.isLoading && model.items.isEmpty {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                        Text("Finding reclaimable space…")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 220)
-                } else {
-                    totalsRow
-                    tierSection(.cache, label: "Free to clear", caption: "regenerates itself — zero cost")
-                    tierSection(.regenerable, label: "Costs a rebuild", caption: "restorable with a reinstall or recompile")
+        Screen(
+            title: "Caches",
+            subtitle: "Every reclaimable location the registry recognizes — found for you.",
+            actions: {
+                BarButton(label: "Refresh", symbol: "arrow.clockwise", disabled: model.isLoading) {
+                    Task { await model.refresh() }
                 }
             }
-            .padding(Theme.pagePadding)
+        ) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.sectionGap) {
+                    if model.isLoading && model.items.isEmpty {
+                        VStack(spacing: 12) {
+                            ProgressView()
+                            Text("Finding reclaimable space…")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 220)
+                    } else {
+                        StatStrip(columns: [
+                            .init(
+                                label: "Free to clear",
+                                value: (model.totals[.cache] ?? 0).bytesFormatted,
+                                caption: "Pure caches — clearing costs nothing.",
+                                tint: Theme.tierCache
+                            ),
+                            .init(
+                                label: "If you rebuild",
+                                value: (model.totals[.regenerable] ?? 0).bytesFormatted,
+                                caption: "Build artifacts and dependencies — one install away.",
+                                tint: Theme.tierRegenerable
+                            ),
+                        ])
+                        tierSection(.cache, label: "Free to clear", caption: "regenerates itself — zero cost")
+                        tierSection(.regenerable, label: "Costs a rebuild", caption: "restorable with a reinstall or recompile")
+                    }
+                }
+                .padding(28)
+            }
         }
         .task { await model.loadIfNeeded() }
-    }
-
-    private var totalsRow: some View {
-        HStack(spacing: 14) {
-            StatTile(
-                symbol: "leaf",
-                tint: Theme.tierCache,
-                label: "Free to clear",
-                value: (model.totals[.cache] ?? 0).bytesFormatted,
-                caption: "Pure caches — clearing costs nothing."
-            )
-            StatTile(
-                symbol: "hammer",
-                tint: Theme.tierRegenerable,
-                label: "If you rebuild",
-                value: (model.totals[.regenerable] ?? 0).bytesFormatted,
-                caption: "Build artifacts and dependencies — one install away."
-            )
-        }
     }
 
     @ViewBuilder

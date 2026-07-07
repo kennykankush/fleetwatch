@@ -34,19 +34,38 @@ struct AppsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            PageHeader(title: "Apps", subtitle: subtitle)
-            filterChips
-
+        Screen(title: "Apps", subtitle: subtitle, actions: { filterChips }) {
             if model.apps.isEmpty {
                 ProgressView("Taking the census…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                appList
+                VStack(spacing: 0) {
+                    tableHeader
+                    Divider().overlay(Theme.hairline)
+                    appList
+                }
             }
         }
-        .padding(Theme.pagePadding)
         .task { await model.load() }
+    }
+
+    private var tableHeader: some View {
+        HStack(spacing: 12) {
+            Color.clear.frame(width: 28, height: 1)
+            Text("APPLICATION")
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("SOURCE")
+                .frame(width: 100, alignment: .leading)
+            Text("LAST USED")
+                .frame(width: 100, alignment: .trailing)
+            Text("SIZE")
+                .frame(width: 80, alignment: .trailing)
+        }
+        .font(.system(size: 10, weight: .semibold))
+        .tracking(1.2)
+        .foregroundStyle(.tertiary)
+        .padding(.horizontal, 40)
+        .padding(.vertical, 10)
     }
 
     private var subtitle: String {
@@ -100,11 +119,13 @@ struct AppsView: View {
 
     private var appList: some View {
         ScrollView {
-            LazyVStack(spacing: 4) {
+            LazyVStack(spacing: 2) {
                 ForEach(filtered) { app in
                     AppRow(app: app)
                 }
             }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 12)
         }
         .scrollIndicators(.hidden)
     }
@@ -132,13 +153,23 @@ private struct AppRow: View {
 
             Spacer()
 
-            if let lastUsed = app.lastUsed {
-                Text(lastUsed, format: .relative(presentation: .named))
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+            HStack {
+                TierBadge(label: app.source.displayName, color: sourceColor)
+                Spacer(minLength: 0)
             }
+            .frame(width: 100)
 
-            TierBadge(label: app.source.displayName, color: sourceColor)
+            Group {
+                if let lastUsed = app.lastUsed {
+                    Text(lastUsed, format: .relative(presentation: .named))
+                } else {
+                    Text("—")
+                }
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(.tertiary)
+            .lineLimit(1)
+            .frame(width: 100, alignment: .trailing)
 
             Group {
                 if let size = app.sizeBytes {
