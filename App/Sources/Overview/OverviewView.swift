@@ -21,26 +21,25 @@ struct OverviewView: View {
             title: "Overview",
             subtitle: "Your disk, honestly — physical bytes and what's effectively yours."
         ) {
-            // A dashboard fits — it never scrolls.
-            VStack(alignment: .leading, spacing: 16) {
-                SetupCard()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    SetupCard()
 
-                if let accounting {
-                    CapacityHero(accounting: accounting)
-                    reclaimableStrip
-                } else if let loadError {
-                    Card {
-                        Label(loadError, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(Theme.tierRegenerable)
+                    if let accounting {
+                        CapacityHero(accounting: accounting)
+                        reclaimableStrip
+                    } else if let loadError {
+                        Card {
+                            Label(loadError, systemImage: "exclamationmark.triangle")
+                                .foregroundStyle(Theme.tierRegenerable)
+                        }
+                    } else {
+                        ProgressView("Measuring…")
+                            .frame(maxWidth: .infinity, minHeight: 240)
                     }
-                } else {
-                    ProgressView("Measuring…")
-                        .frame(maxWidth: .infinity, minHeight: 240)
                 }
-
-                Spacer(minLength: 0)
+                .padding(28)
             }
-            .padding(24)
         }
         .task { await load() }
     }
@@ -116,8 +115,8 @@ private struct CapacityHero: View {
                                 .foregroundStyle(.secondary)
                         }
                         Text(accounting.physicalUsedFraction, format: .percent.precision(.fractionLength(0)))
-                            .font(.system(size: 82, weight: .semibold, design: .rounded))
-                            .tracking(-3.2)
+                            .font(.system(size: 96, weight: .semibold, design: .rounded))
+                            .tracking(-4)
                             .monospacedDigit()
                         Text("\(accounting.physicalUsed.bytesFormatted) of \(accounting.totalCapacity.bytesFormatted)")
                             .font(.system(size: 13))
@@ -174,7 +173,7 @@ private struct CapacityHero: View {
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .monospacedDigit()
         }
-        .padding(.vertical, 9)
+        .padding(.vertical, 11)
         .help(hint ?? label)
     }
 

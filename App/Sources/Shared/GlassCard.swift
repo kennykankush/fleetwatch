@@ -33,7 +33,7 @@ struct HeroCard<Content: View>: View {
 
     var body: some View {
         content()
-            .padding(26)
+            .padding(30)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.surface1, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay {
@@ -219,8 +219,6 @@ struct StatStrip: View {
     let columns: [Column]
 
     var body: some View {
-        // fixedSize: the divider Rectangles are vertically greedy — without
-        // this, the strip expands to fill any fixed-height parent.
         Card(padding: 0) {
             HStack(spacing: 0) {
                 ForEach(Array(columns.enumerated()), id: \.element.id) { index, col in
@@ -241,7 +239,7 @@ struct StatStrip: View {
                             .foregroundStyle(.tertiary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(18)
+                    .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     if index < columns.count - 1 {
@@ -253,7 +251,6 @@ struct StatStrip: View {
                 }
             }
         }
-        .fixedSize(horizontal: false, vertical: true)
     }
 }
 
