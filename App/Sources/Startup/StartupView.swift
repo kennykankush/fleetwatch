@@ -12,7 +12,7 @@ struct StartupView: View {
     var body: some View {
         Screen(
             title: "Startup",
-            subtitle: "Login items, agents, and daemons — and what each one actually runs."
+            subtitle: "Login items, agents, and daemons."
         ) {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.sectionGap) {

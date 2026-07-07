@@ -21,7 +21,7 @@ struct BatteryView: View {
     var body: some View {
         Screen(
             title: "Battery",
-            subtitle: "Charge is what they show you. Health is what they don't."
+            subtitle: "Charge, health, and cycle count."
         ) {
             Group {
                 if let b = model.reading {
@@ -55,13 +55,13 @@ struct BatteryView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 7) {
                         RoundedRectangle(cornerRadius: 1.5).fill(healthColor(b)).frame(width: 3, height: 11)
-                        Text("HEALTH — CAPACITY REMAINING")
+                        Text("HEALTH")
                             .font(.system(size: 11, weight: .semibold)).tracking(1.4).foregroundStyle(.secondary)
                     }
                     Text("\(b.healthPercent)%")
                         .font(.system(size: 82, weight: .semibold, design: .rounded)).tracking(-3.2)
                         .foregroundStyle(healthColor(b)).monospacedDigit()
-                    Text("\(b.healthHeadline) · holds \(b.maxCapacity) of \(b.designCapacity) mAh it shipped with")
+                    Text("\(b.healthHeadline) · \(b.maxCapacity) of \(b.designCapacity) mAh")
                         .font(.system(size: 13)).foregroundStyle(.secondary).monospacedDigit()
                 }
                 Spacer(minLength: 40)

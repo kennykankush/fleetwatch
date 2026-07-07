@@ -26,7 +26,7 @@ struct OverviewView: View {
     var body: some View {
         Screen(
             title: "Overview",
-            subtitle: "Your disk, honestly — physical bytes and what's effectively yours.",
+            subtitle: "Disk usage and what's reclaimable.",
             actions: {
                 BarButton(label: reportCopied ? "Copied ✓" : "Copy Report", symbol: "doc.on.doc") {
                     Task {
@@ -107,19 +107,19 @@ struct OverviewView: View {
                 .init(
                     label: "Total",
                     value: reclaimable.items.isEmpty ? "…" : reclaimable.grandTotal.bytesFormatted,
-                    caption: "Everything the registry recognizes as safe to let go.",
+                    caption: "Total safe to clear.",
                     tint: Theme.accent
                 ),
                 .init(
                     label: "Free to clear",
                     value: reclaimable.items.isEmpty ? "…" : (reclaimable.totals[.cache] ?? 0).bytesFormatted,
-                    caption: "Pure caches — they rebuild themselves. Zero cost.",
+                    caption: "Caches. Rebuild on their own.",
                     tint: Theme.tierCache
                 ),
                 .init(
                     label: "If you rebuild",
                     value: reclaimable.items.isEmpty ? "…" : (reclaimable.totals[.regenerable] ?? 0).bytesFormatted,
-                    caption: "Dependencies and build artifacts — one install away.",
+                    caption: "Build files. Restored on next build.",
                     tint: Theme.tierRegenerable
                 ),
             ])
@@ -200,7 +200,7 @@ private struct CapacityHero: View {
                             RoundedRectangle(cornerRadius: 1.5)
                                 .fill(Theme.accent)
                                 .frame(width: 3, height: 11)
-                            Text("PHYSICAL — BYTES ON DISK")
+                            Text("DISK USED")
                                 .font(.system(size: 11, weight: .semibold))
                                 .tracking(1.4)
                                 .foregroundStyle(.secondary)

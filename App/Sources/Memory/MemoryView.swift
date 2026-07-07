@@ -33,7 +33,7 @@ struct MemoryView: View {
     var body: some View {
         Screen(
             title: "Memory",
-            subtitle: "Your RAM, honestly — cached files aren't \"used,\" they're evictable."
+            subtitle: "RAM in use, and what's available."
         ) {
             if let r = model.reading {
                 ScrollView {
@@ -56,7 +56,7 @@ struct MemoryView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 7) {
                         RoundedRectangle(cornerRadius: 1.5).fill(color(r.pressure)).frame(width: 3, height: 11)
-                        Text("HONEST — GENUINELY IN USE")
+                        Text("IN USE")
                             .font(.system(size: 11, weight: .semibold)).tracking(1.4).foregroundStyle(.secondary)
                     }
                     Text(r.usedFraction, format: .percent.precision(.fractionLength(0)))
@@ -66,7 +66,7 @@ struct MemoryView: View {
                 }
                 Spacer(minLength: 40)
                 VStack(spacing: 0) {
-                    metricRow("Naive \"used\"", (r.total - r.free).bytesFormatted, hint: "what other tools show", tint: .white.opacity(0.35))
+                    metricRow("Naive \"used\"", (r.total - r.free).bytesFormatted, hint: "includes cached files", tint: .white.opacity(0.35))
                     Divider().overlay(Theme.hairline)
                     metricRow("Cached files", r.cached.bytesFormatted, hint: "evictable — the difference", tint: Theme.purgeable.opacity(0.55))
                     Divider().overlay(Theme.hairline)

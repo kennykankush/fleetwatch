@@ -91,7 +91,7 @@ struct HeatView: View {
     var body: some View {
         Screen(
             title: "Heat",
-            subtitle: "Who's driving the heat — by share of active compute load, not degrees.",
+            subtitle: "Processes by share of active CPU load.",
             actions: {
                 BarButton(label: live ? "Live ●" : "Go live", symbol: live ? "dot.radiowaves.left.and.right" : "play") {
                     live.toggle()
@@ -157,7 +157,7 @@ struct HeatView: View {
                         .font(.system(size: 40, weight: .semibold, design: .rounded))
                         .tracking(-1)
                         .foregroundStyle(color(for: reading.level))
-                    Text("macOS-reported pressure — the honest, stable signal (no per-chip °C guessing).")
+                    Text("From the macOS thermal state.")
                         .font(.system(size: 12)).foregroundStyle(.tertiary)
                 }
                 Spacer()
@@ -200,9 +200,9 @@ struct HeatView: View {
     private func forecastText(reading: ThermalReading, top: HeatContributor, relief: HeatForecast.Relief) -> String {
         let share = Int(reading.share(of: top.load) * 100)
         if relief.willLikelyEase {
-            return "\(top.displayName) is ~\(share)% of your active load. Quitting it sheds ~\(Int(relief.removedShare * 100))% — pressure would likely ease toward \(relief.projectedLevel.headline.lowercased()) within ~30s (thermal lag)."
+            return "\(top.displayName): \(share)% of active load. Quitting it should ease pressure toward \(relief.projectedLevel.headline.lowercased())."
         } else {
-            return "\(top.displayName) is ~\(share)% of your active load. Quitting it helps a little, but wouldn't change the overall pressure much on its own."
+            return "\(top.displayName): \(share)% of active load. Quitting it won't change overall pressure much."
         }
     }
 

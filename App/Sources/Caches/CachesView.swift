@@ -100,7 +100,7 @@ struct CachesView: View {
     var body: some View {
         Screen(
             title: "Caches",
-            subtitle: "Every reclaimable location the registry recognizes — found for you.",
+            subtitle: "Caches and build files safe to clear.",
             actions: {
                 BarButton(label: "Refresh", symbol: "arrow.clockwise", disabled: model.isLoading) {
                     Task { await model.refresh() }
@@ -154,24 +154,24 @@ struct CachesView: View {
                             .init(
                                 label: "Free to clear",
                                 value: model.freeToClearBytes.bytesFormatted,
-                                caption: "Pure caches — clearing costs nothing.",
+                                caption: "Caches. Rebuild on their own.",
                                 tint: Theme.tierCache
                             ),
                             .init(
                                 label: "If you rebuild",
                                 value: model.regenerableBytes.bytesFormatted,
-                                caption: "Build artifacts and dependencies — one install away.",
+                                caption: "Build files. Restored on next build.",
                                 tint: Theme.tierRegenerable
                             ),
                             .init(
                                 label: "Review first",
                                 value: model.sensitiveBytes.bytesFormatted,
-                                caption: "Convention caches that may hold logins — check before clearing.",
+                                caption: "May hold logins. Check first.",
                                 tint: Theme.tierData
                             ),
                         ])
-                        tierSection(.cache, label: "Free to clear", caption: "regenerates itself — zero cost")
-                        tierSection(.regenerable, label: "Costs a rebuild", caption: "restorable with a reinstall or recompile")
+                        tierSection(.cache, label: "Free to clear", caption: "rebuild on their own")
+                        tierSection(.regenerable, label: "Costs a rebuild", caption: "restored on next build")
                     }
                 }
                 .padding(28)

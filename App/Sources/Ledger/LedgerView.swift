@@ -30,7 +30,7 @@ struct LedgerView: View {
     var body: some View {
         Screen(
             title: "Ledger",
-            subtitle: "Every snapshot and every action, recorded. Storage with a memory."
+            subtitle: "History of snapshots and actions."
         ) {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.sectionGap) {
