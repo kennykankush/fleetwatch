@@ -94,6 +94,14 @@ Sizing never follows symlinks and never reads file contents (iCloud dataless
 files stay in the cloud). Deleting — when it ships — is Trash-only and
 ledger-recorded. The tier system is enforced in code and covered by tests.
 
+**Are the sizes exact?**
+Allocated bytes on disk — honest for sparse files, and measured once then
+cached until the mtime changes or you refresh (each view shows *when* it was
+measured). One blind spot we share with every scanner including Finder: APFS
+clone files share storage under the hood but each reports its full size, so
+sums can slightly exceed true usage. macOS exposes no API to see clone
+sharing — anyone claiming clone-exact numbers is guessing.
+
 **Why no treemap?**
 Treemaps show you bytes. Stockpile shows you *meaning*. If you want rectangles,
 GrandPerspective is excellent.

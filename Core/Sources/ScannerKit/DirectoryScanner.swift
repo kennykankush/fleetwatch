@@ -8,8 +8,10 @@ public struct ScannedEntry: Sendable, Identifiable, Hashable {
     public let url: URL
     public let name: String
     public let isDirectory: Bool
-    /// Allocated bytes on disk (not logical size — APFS clones and sparse
-    /// files report what they actually occupy).
+    /// Allocated bytes on disk. Honest for sparse files (allocated, not
+    /// logical size). APFS clones are NOT deduplicated — each clone reports
+    /// its full allocated size, so sums can exceed real disk usage. Every
+    /// scanner shares this limitation, Finder included.
     public let sizeBytes: Int64
     /// When this size was measured — from cache, this can be in the past.
     public let measuredAt: Date

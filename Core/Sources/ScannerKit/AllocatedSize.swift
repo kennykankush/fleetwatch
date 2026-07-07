@@ -3,6 +3,11 @@ import Foundation
 /// Honest sizing: allocated bytes on disk, symlinks never followed, file
 /// contents never read (iCloud dataless files stay dataless).
 ///
+/// Known limitation: APFS clone files share storage but each reports its
+/// full allocated size, so directory sums can exceed true disk usage. No
+/// public API exposes clone sharing; every scanner (Finder included) has
+/// this blind spot. Sparse files, by contrast, ARE reported honestly.
+///
 /// Enumeration is batched inside autorelease pools — Foundation's enumerator
 /// autoreleases every URL it yields, and on million-file trees that spike
 /// would otherwise hold gigabytes until the walk finishes.
