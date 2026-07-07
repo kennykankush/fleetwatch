@@ -22,6 +22,7 @@ is exactly how this app got born.
 
 ```sh
 brew tap kennykankush/stockpile https://github.com/kennykankush/stockpile
+brew trust kennykankush/stockpile   # newer Homebrew requires this for third-party taps
 brew install --cask stockpile
 ```
 
