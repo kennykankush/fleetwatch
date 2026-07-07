@@ -33,7 +33,7 @@ struct HeroCard<Content: View>: View {
 
     var body: some View {
         content()
-            .padding(30)
+            .padding(26)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.surface1, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay {
@@ -239,7 +239,7 @@ struct StatStrip: View {
                             .foregroundStyle(.tertiary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(20)
+                    .padding(18)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     if index < columns.count - 1 {

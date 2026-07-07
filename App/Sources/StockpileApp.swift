@@ -5,7 +5,7 @@ struct StockpileApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
-                .frame(minWidth: 1040, minHeight: 680)
+                .frame(minWidth: 1040, minHeight: 700)
                 .preferredColorScheme(.dark)
                 .task { MemoryPressureMonitor.shared.start() }
         }
