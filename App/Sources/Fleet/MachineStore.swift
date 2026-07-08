@@ -129,9 +129,12 @@ enum LocalTelemetry {
                 osName: "macOS \(v.majorVersion).\(v.minorVersion)",
                 kernel: sysctlString("kern.osrelease")
             ),
-            diskTotal: disk?.totalCapacity ?? 0,
-            diskUsed: disk?.physicalUsed ?? 0,
-            diskFree: disk?.physicalFree ?? 0,
+            disks: [DiskVolume(
+                name: "Macintosh HD",
+                total: disk?.totalCapacity ?? 0,
+                used: disk?.physicalUsed ?? 0,
+                free: disk?.physicalFree ?? 0
+            )],
             memTotal: mem?.total ?? 0,
             memUsed: mem?.used ?? 0,
             memAvailable: mem?.available ?? 0,

@@ -1,30 +1,36 @@
 import SwiftUI
 import FleetKit
 
-/// The cockpit home — every machine as an at-a-glance health tile.
+/// The cockpit home — every machine as a rich health tile with a mini gauge.
 struct FleetGridView: View {
     @State private var store = MachineStore.shared
     let onOpen: (Machine) -> Void
     @State private var addingMachine = false
+    @State private var updates = UpdateChecker.shared
 
-    private let columns = [GridItem(.adaptive(minimum: 280, maximum: 400), spacing: 16)]
+    private let columns = [GridItem(.adaptive(minimum: 310, maximum: 460), spacing: 16, alignment: .top)]
 
     var body: some View {
         Screen(
             title: "Fleet",
-            subtitle: "\(store.machines.count) machine\(store.machines.count == 1 ? "" : "s")",
+            subtitle: "\(store.machines.count) machine\(store.machines.count == 1 ? "" : "s") · \(store.online.values.filter { $0 }.count + 1 - (store.online[store.local.id] == false ? 1 : 0)) reachable",
             actions: {
                 BarButton(label: "Refresh all", symbol: "arrow.clockwise") { Task { await store.refreshAll() } }
             }
         ) {
             ScrollView {
+                if let latest = updates.latestVersion {
+                    UpdateBanner(version: latest)
+                        .padding(.horizontal, Theme.pagePadding)
+                        .padding(.top, Theme.pagePadding)
+                }
                 LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(store.machines) { machine in
                         Button { onOpen(machine) } label: {
                             MachineTile(
                                 machine: machine,
                                 telemetry: store.telemetry[machine.id],
-                                online: store.online[machine.id],
+                                online: store.online[machine.id] ?? (machine.kind == .local),
                                 refreshing: store.refreshing.contains(machine.id)
                             )
                         }
@@ -38,10 +44,13 @@ struct FleetGridView: View {
                     Button { addingMachine = true } label: { AddTile() }
                         .buttonStyle(Pressable())
                 }
-                .padding(28)
+                .padding(Theme.pagePadding)
             }
         }
-        .task { await store.refreshAll() }
+        .task {
+            await store.refreshAll()
+            await updates.checkIfNeeded()
+        }
         .sheet(isPresented: $addingMachine) { AddMachineView() }
     }
 }
@@ -49,54 +58,89 @@ struct FleetGridView: View {
 private struct MachineTile: View {
     let machine: Machine
     let telemetry: MachineTelemetry?
-    let online: Bool?
+    let online: Bool
     let refreshing: Bool
 
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 9) {
-                    IconTile(symbol: osSymbol, tint: statusTint, size: 30)
+                HStack(spacing: 10) {
+                    IconTile(symbol: osSymbol, tint: online ? Theme.accent : Theme.inkTertiary, size: 32)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(machine.name).font(.system(size: 14, weight: .semibold)).lineLimit(1)
-                        Text(machine.kind == .local ? "this machine" : machine.host)
-                            .font(.system(size: 10.5)).foregroundStyle(.tertiary).lineLimit(1)
+                        Text(machine.name).font(.system(size: 14.5, weight: .bold)).lineLimit(1)
+                        Text(subtitleText)
+                            .font(.system(size: 10.5)).foregroundStyle(Theme.inkTertiary).lineLimit(1)
                     }
                     Spacer()
-                    statusDot
+                    Circle().fill(online ? Theme.ok : Theme.inkTertiary.opacity(0.4)).frame(width: 9, height: 9)
                 }
 
-                if let t = telemetry, online != false {
-                    HStack(spacing: 0) {
-                        stat("DISK", t.diskUsedFraction.formatted(.percent.precision(.fractionLength(0))), frac(t.diskUsedFraction))
-                        stat("MEM", t.memUsedFraction.formatted(.percent.precision(.fractionLength(0))), frac(t.memUsedFraction))
-                        stat("LOAD", String(format: "%.1f", t.load1), frac(t.loadFraction))
-                        if t.hasDocker { stat("🐳", "\(t.containers.count)", Theme.accent) }
+                if let t = telemetry, online {
+                    HStack(spacing: 16) {
+                        // Mini disk gauge.
+                        ZStack {
+                            ArcGauge(fraction: t.diskUsedFraction, tint: Theme.metricDisk, lineWidth: 8, size: 72)
+                            VStack(spacing: 0) {
+                                Text(t.diskUsedFraction, format: .percent.precision(.fractionLength(0)))
+                                    .font(.system(size: 15, weight: .bold, design: .rounded)).monospacedDigit()
+                                Text("disk").font(.system(size: 8)).foregroundStyle(.secondary)
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 7) {
+                            miniBar("MEM", t.memUsedFraction, Theme.metricMemory)
+                            miniBar("LOAD", min(t.loadFraction, 1), Theme.metricCPU)
+                            HStack(spacing: 10) {
+                                if t.disks.count > 1 {
+                                    Text("\(t.disks.count) disks")
+                                        .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.inkTertiary)
+                                }
+                                if t.hasDocker {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "shippingbox.fill").font(.system(size: 8.5))
+                                        Text("\(t.containers.count)")
+                                            .font(.system(size: 10, weight: .semibold)).monospacedDigit()
+                                    }
+                                    .foregroundStyle(Theme.accent)
+                                }
+                                if t.hasBattery {
+                                    Image(systemName: "battery.100percent").font(.system(size: 9)).foregroundStyle(Theme.ok)
+                                }
+                                Spacer()
+                            }
+                        }
                     }
                 } else {
-                    Text(refreshing ? "connecting…" : "offline")
-                        .font(.system(size: 12)).foregroundStyle(.tertiary)
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 6)
+                    HStack(spacing: 8) {
+                        if refreshing { ProgressView().controlSize(.small) }
+                        Text(refreshing ? "connecting…" : "offline")
+                            .font(.system(size: 11.5)).foregroundStyle(Theme.inkTertiary)
+                    }
+                    .frame(height: 72)
                 }
             }
         }
     }
 
-    private func stat(_ label: String, _ value: String, _ tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(label).font(.system(size: 9, weight: .semibold)).tracking(0.6).foregroundStyle(.secondary)
-            Text(value).font(.system(size: 16, weight: .semibold, design: .rounded)).foregroundStyle(tint).monospacedDigit()
+    private func miniBar(_ label: String, _ fraction: Double, _ tint: Color) -> some View {
+        HStack(spacing: 8) {
+            Text(label).font(.system(size: 8.5, weight: .semibold)).tracking(0.6)
+                .foregroundStyle(Theme.inkTertiary).frame(width: 30, alignment: .leading)
+            ProgressBar(fraction: fraction, tint: tint)
+            Text(fraction, format: .percent.precision(.fractionLength(0)))
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .monospacedDigit().foregroundStyle(.secondary).frame(width: 30, alignment: .trailing)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var subtitleText: String {
+        if machine.kind == .local { return "this machine" }
+        if let t = telemetry, online { return "\(t.hardware.osName) · \(machine.host)" }
+        return machine.host
     }
 
     private var osSymbol: String {
-        switch machine.os { case .macOS: "laptopcomputer"; case .linux: "server.rack"; case .windows: "pc"; default: "desktopcomputer" }
-    }
-    private var statusTint: Color { online == false ? .secondary : Theme.accent }
-    private var statusDot: some View {
-        Circle().fill(online == false ? Color.secondary.opacity(0.5) : (online == true ? Theme.tierCache : Theme.tierRegenerable))
-            .frame(width: 8, height: 8)
+        if machine.kind == .local { return "laptopcomputer" }
+        switch machine.os { case .windows: return "pc"; case .linux: return "server.rack"; default: return "desktopcomputer" }
     }
 }
 
@@ -104,15 +148,11 @@ private struct AddTile: View {
     var body: some View {
         Card {
             HStack(spacing: 10) {
-                IconTile(symbol: "plus", size: 30)
-                Text("Add machine").font(.system(size: 14, weight: .medium)).foregroundStyle(.secondary)
+                IconTile(symbol: "plus", size: 32)
+                Text("Add machine").font(.system(size: 13.5, weight: .medium)).foregroundStyle(.secondary)
                 Spacer()
             }
-            .frame(minHeight: 64)
+            .frame(minHeight: 100)
         }
     }
-}
-
-private func frac(_ f: Double) -> Color {
-    f > 0.9 ? Theme.tierData : f > 0.75 ? Theme.tierRegenerable : Theme.tierCache
 }

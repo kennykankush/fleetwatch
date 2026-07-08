@@ -11,7 +11,7 @@ public enum LinuxProbe {
     echo "===CPU==="; nproc; lscpu 2>/dev/null | grep -E "^Model name" | sed "s/Model name: *//"
     echo "===LOAD==="; cat /proc/loadavg
     echo "===MEM==="; free -b | grep -E "^Mem"
-    echo "===DISK==="; df -B1 --output=size,used,avail,pcent,target / 2>/dev/null | tail -1
+    echo "===DISK==="; df -B1 -x tmpfs -x devtmpfs -x squashfs -x overlay -x efivarfs --output=target,size,used,avail 2>/dev/null | tail -n +2
     echo "===UPTIME==="; awk '{print $1}' /proc/uptime
     echo "===DOCKER==="; if command -v docker >/dev/null 2>&1; then docker ps --format '{{.Names}}|{{.Status}}' 2>/dev/null || echo DOCKER_NOPERM; else echo NO_DOCKER; fi
     echo "===BATTERY==="; ls /sys/class/power_supply/ 2>/dev/null | grep -iE "^BAT" || echo NO_BATTERY
@@ -21,7 +21,7 @@ public enum LinuxProbe {
     public static func parse(_ output: String) -> MachineTelemetry? {
         let sections = splitSections(output)
         guard let mem = sections["MEM"]?.first,
-              let disk = sections["DISK"]?.first,
+              let diskLines = sections["DISK"], !diskLines.isEmpty,
               let cpuLines = sections["CPU"], cpuLines.count >= 1 else { return nil }
 
         // MEM: "Mem:  total used free shared buff/cache available"
@@ -29,9 +29,21 @@ public enum LinuxProbe {
         guard memF.count >= 6 else { return nil }
         let (memTotal, memUsed, memCached, memAvail) = (memF[0], memF[1], memF[4], memF[5])
 
-        // DISK: "size used avail pcent target"
-        let diskF = disk.split(separator: " ", omittingEmptySubsequences: true)
-        guard diskF.count >= 3, let dTotal = Int64(diskF[0]), let dUsed = Int64(diskF[1]), let dFree = Int64(diskF[2]) else { return nil }
+        // DISK: one line per mount — "target size used avail". Boot/efi
+        // partitions are noise; system root sorts first, then by size.
+        var disks: [DiskVolume] = diskLines.compactMap { line in
+            let f = line.split(separator: " ", omittingEmptySubsequences: true)
+            guard f.count >= 4, let total = Int64(f[1]), let used = Int64(f[2]), let free = Int64(f[3]) else { return nil }
+            let mount = String(f[0])
+            guard !mount.hasPrefix("/boot") else { return nil }
+            return DiskVolume(name: mount, total: total, used: used, free: free)
+        }
+        disks.sort { a, b in
+            if a.name == "/" { return true }
+            if b.name == "/" { return false }
+            return a.total > b.total
+        }
+        guard !disks.isEmpty else { return nil }
 
         let cores = Int(cpuLines[0].trimmingCharacters(in: .whitespaces)) ?? 0
         let cpuModel = cpuLines.count >= 2 ? cpuLines[1] : "Unknown CPU"
@@ -60,7 +72,7 @@ public enum LinuxProbe {
 
         return MachineTelemetry(
             hardware: hardware,
-            diskTotal: dTotal, diskUsed: dUsed, diskFree: dFree,
+            disks: disks,
             memTotal: memTotal, memUsed: memUsed, memAvailable: memAvail, memCached: memCached,
             load1: load.count > 0 ? load[0] : 0, load5: load.count > 1 ? load[1] : 0, load15: load.count > 2 ? load[2] : 0,
             uptime: uptime, hasDocker: hasDocker, hasBattery: hasBattery, containers: containers

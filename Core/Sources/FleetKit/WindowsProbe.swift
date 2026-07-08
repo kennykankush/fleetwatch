@@ -14,13 +14,12 @@ public enum WindowsProbe {
     $ErrorActionPreference='SilentlyContinue'
     $os=Get-CimInstance Win32_OperatingSystem
     $cpu=Get-CimInstance Win32_Processor | Select-Object -First 1
-    $d=Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
     $perf=Get-CimInstance Win32_PerfFormattedData_PerfOS_Memory
     $bat=Get-CimInstance Win32_Battery
     "===OS==="; $os.Caption; [System.Environment]::OSVersion.Version.ToString()
     "===CPU==="; $cpu.NumberOfLogicalProcessors; $cpu.Name
     "===MEM==="; "$($os.TotalVisibleMemorySize) $($os.FreePhysicalMemory) $($perf.AvailableBytes) $([int64]$perf.StandbyCacheNormalPriorityBytes + [int64]$perf.StandbyCacheReserveBytes + [int64]$perf.StandbyCacheCoreBytes)"
-    "===DISK==="; "$($d.Size) $($d.FreeSpace)"
+    "===DISK==="; Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object { "$($_.DeviceID) $($_.Size) $($_.FreeSpace)" }
     "===LOAD==="; $cpu.LoadPercentage
     "===UPTIME==="; [int]((Get-Date)-$os.LastBootUpTime).TotalSeconds
     "===GPU==="; (Get-CimInstance Win32_VideoController | Where-Object { $_.AdapterRAM -gt 0 } | Sort-Object AdapterRAM -Descending | Select-Object -First 1).Name
@@ -31,7 +30,7 @@ public enum WindowsProbe {
     public static func parse(_ output: String) -> MachineTelemetry? {
         // PowerShell over SSH emits CRLF — normalize before anything else.
         let s = splitSections(output.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n"))
-        guard let mem = s["MEM"]?.first, let disk = s["DISK"]?.first,
+        guard let mem = s["MEM"]?.first, let disk = s["DISK"], !disk.isEmpty,
               let cpuLines = s["CPU"], cpuLines.count >= 1 else { return nil }
 
         // MEM: "totalKB freeKB [availableBytes standbyBytes]" — the bracketed
@@ -49,10 +48,19 @@ public enum WindowsProbe {
         }
         let memUsed = max(0, memTotal - memAvailable)
 
-        // DISK: "size free" (bytes) for C:.
-        let diskF = disk.split(separator: " ").compactMap { Int64($0) }
-        guard diskF.count >= 2 else { return nil }
-        let dTotal = diskF[0], dFree = diskF[1], dUsed = max(0, diskF[0] - diskF[1])
+        // DISK: one line per fixed drive — "C: size free". System drive (C:)
+        // first, then by size.
+        var disks: [DiskVolume] = disk.compactMap { line in
+            let f = line.split(separator: " ")
+            guard f.count >= 3, let total = Int64(f[1]), let free = Int64(f[2]) else { return nil }
+            return DiskVolume(name: String(f[0]), total: total, used: max(0, total - free), free: free)
+        }
+        disks.sort { a, b in
+            if a.name.uppercased() == "C:" { return true }
+            if b.name.uppercased() == "C:" { return false }
+            return a.total > b.total
+        }
+        guard !disks.isEmpty else { return nil }
 
         let cores = Int(cpuLines[0].trimmingCharacters(in: .whitespaces)) ?? 0
         let cpuModel = (cpuLines.count >= 2 ? cpuLines[1] : "Unknown CPU").trimmingCharacters(in: .whitespaces)
@@ -79,7 +87,7 @@ public enum WindowsProbe {
 
         return MachineTelemetry(
             hardware: hardware,
-            diskTotal: dTotal, diskUsed: dUsed, diskFree: dFree,
+            disks: disks,
             memTotal: memTotal, memUsed: memUsed, memAvailable: memAvailable, memCached: memCached,
             load1: load, load5: load, load15: load,
             uptime: TimeInterval(s["UPTIME"]?.first ?? "") ?? 0,

@@ -16,7 +16,8 @@ struct WindowsProbeTests {
     ===MEM===
     33474540 12333784 12557271040 12548792320
     ===DISK===
-    998324412416 701890568192
+    C: 998324412416 701890568192
+    D: 2000381014016 1793117249536
     ===LOAD===
     7
     ===UPTIME===
@@ -56,6 +57,16 @@ struct WindowsProbeTests {
         let t = try #require(WindowsProbe.parse(legacy))
         #expect(t.memAvailable == 12333784 * 1024)
         #expect(t.memCached == 0)
+    }
+
+    @Test("ALL fixed drives detected — magi's 2TB D: was invisible before")
+    func multiDisk() throws {
+        let t = try #require(WindowsProbe.parse(Self.realOutput))
+        #expect(t.disks.count == 2)
+        #expect(t.disks[0].name == "C:")             // system drive first
+        #expect(t.disks[1].name == "D:")
+        #expect(t.disks[1].total == 2000381014016)   // the mac-archives drive
+        #expect(t.disks[1].free == 1793117249536)
     }
 
     @Test("Disk bytes, and CPU load% normalized to a load-average shape")
