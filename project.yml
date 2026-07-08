@@ -50,6 +50,7 @@ targets:
           - HonestKit
           - MemoryKit
           - BatteryKit
+          - FleetKit
       - target: FleetwatchWidget
         embed: true
     settings:
