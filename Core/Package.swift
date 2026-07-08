@@ -13,8 +13,12 @@ let package = Package(
         .library(name: "HonestKit", targets: ["HonestKit"]),
         .library(name: "MemoryKit", targets: ["MemoryKit"]),
         .library(name: "BatteryKit", targets: ["BatteryKit"]),
+        .library(name: "FleetKit", targets: ["FleetKit"]),
     ],
     targets: [
+        .target(
+            name: "FleetKit"
+        ),
         .target(
             name: "LedgerKit"
         ),
@@ -70,6 +74,10 @@ let package = Package(
         .testTarget(
             name: "BatteryKitTests",
             dependencies: ["BatteryKit"]
+        ),
+        .testTarget(
+            name: "FleetKitTests",
+            dependencies: ["FleetKit"]
         ),
     ],
     swiftLanguageModes: [.v6]
