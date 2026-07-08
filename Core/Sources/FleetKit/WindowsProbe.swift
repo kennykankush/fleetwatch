@@ -3,19 +3,28 @@ import Foundation
 /// The Windows telemetry probe: a PowerShell script piped over SSH (Windows
 /// OpenSSH defaults to cmd, so we pipe to `powershell -Command -`). Emits the
 /// same `===SECTION===` format as the Linux probe so parsing is uniform.
+///
+/// Memory honesty: CIM's FreePhysicalMemory actually reports *available*
+/// (standby cache included). Perf counters split it properly — AvailableBytes
+/// plus the standby-cache trio — so Windows gets the same used/cached/
+/// available story as Linux and macOS: standby cache is reclaimable on
+/// demand, not "used."
 public enum WindowsProbe {
     public static let script = """
+    $ErrorActionPreference='SilentlyContinue'
     $os=Get-CimInstance Win32_OperatingSystem
     $cpu=Get-CimInstance Win32_Processor | Select-Object -First 1
-    $cs=Get-CimInstance Win32_ComputerSystem
     $d=Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
+    $perf=Get-CimInstance Win32_PerfFormattedData_PerfOS_Memory
+    $bat=Get-CimInstance Win32_Battery
     "===OS==="; $os.Caption; [System.Environment]::OSVersion.Version.ToString()
     "===CPU==="; $cpu.NumberOfLogicalProcessors; $cpu.Name
-    "===MEM==="; "$($os.TotalVisibleMemorySize) $($os.FreePhysicalMemory)"
+    "===MEM==="; "$($os.TotalVisibleMemorySize) $($os.FreePhysicalMemory) $($perf.AvailableBytes) $([int64]$perf.StandbyCacheNormalPriorityBytes + [int64]$perf.StandbyCacheReserveBytes + [int64]$perf.StandbyCacheCoreBytes)"
     "===DISK==="; "$($d.Size) $($d.FreeSpace)"
     "===LOAD==="; $cpu.LoadPercentage
     "===UPTIME==="; [int]((Get-Date)-$os.LastBootUpTime).TotalSeconds
     "===GPU==="; (Get-CimInstance Win32_VideoController | Where-Object { $_.AdapterRAM -gt 0 } | Sort-Object AdapterRAM -Descending | Select-Object -First 1).Name
+    "===BATTERY==="; if ($bat) { "BAT" } else { "NO_BATTERY" }
     "===DOCKER==="; if (Get-Command docker -ErrorAction SilentlyContinue) { docker ps --format '{{.Names}}|{{.Status}}' } else { "NO_DOCKER" }
     """
 
@@ -25,12 +34,20 @@ public enum WindowsProbe {
         guard let mem = s["MEM"]?.first, let disk = s["DISK"]?.first,
               let cpuLines = s["CPU"], cpuLines.count >= 1 else { return nil }
 
-        // MEM: "totalVisibleKB freePhysicalKB" (KiB). Windows has no clean
-        // cache figure — available ≈ free, cache unknown.
+        // MEM: "totalKB freeKB [availableBytes standbyBytes]" — the bracketed
+        // pair comes from perf counters; degrade gracefully if they're absent.
         let memF = mem.split(separator: " ").compactMap { Int64($0) }
         guard memF.count >= 2 else { return nil }
-        let memTotal = memF[0] * 1024, memFree = memF[1] * 1024
-        let memUsed = max(0, memTotal - memFree)
+        let memTotal = memF[0] * 1024
+        let memAvailable: Int64, memCached: Int64
+        if memF.count >= 4, memF[2] > 0 {
+            memAvailable = memF[2]
+            memCached = min(memF[3], memAvailable)
+        } else {
+            memAvailable = memF[1] * 1024   // CIM "free" is really available
+            memCached = 0
+        }
+        let memUsed = max(0, memTotal - memAvailable)
 
         // DISK: "size free" (bytes) for C:.
         let diskF = disk.split(separator: " ").compactMap { Int64($0) }
@@ -63,10 +80,12 @@ public enum WindowsProbe {
         return MachineTelemetry(
             hardware: hardware,
             diskTotal: dTotal, diskUsed: dUsed, diskFree: dFree,
-            memTotal: memTotal, memUsed: memUsed, memAvailable: memFree, memCached: 0,
+            memTotal: memTotal, memUsed: memUsed, memAvailable: memAvailable, memCached: memCached,
             load1: load, load5: load, load15: load,
             uptime: TimeInterval(s["UPTIME"]?.first ?? "") ?? 0,
-            hasDocker: hasDocker, hasBattery: false, containers: containers
+            hasDocker: hasDocker,
+            hasBattery: (s["BATTERY"]?.first ?? "NO_BATTERY") == "BAT",
+            containers: containers
         )
     }
 
