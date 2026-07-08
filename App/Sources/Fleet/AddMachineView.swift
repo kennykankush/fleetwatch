@@ -75,10 +75,11 @@ struct AddMachineView: View {
         testing = true; testResult = nil
         defer { testing = false }
         let ssh = SSHRunner(host: host, user: user)
-        do {
-            let out = try await ssh.run("uname -sr")
-            testResult = .ok("Connected — \(out.trimmingCharacters(in: .whitespacesAndNewlines))")
-        } catch {
+        if await ssh.ping() {
+            let os = await ssh.detectOS()
+            let osName = os == .windows ? "Windows" : os == .macOS ? "macOS" : os == .linux ? "Linux" : "reachable"
+            testResult = .ok("Connected — \(osName)")
+        } else {
             testResult = .failed("Couldn't connect. Check the host, user, and that your SSH key works.")
         }
     }

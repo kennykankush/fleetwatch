@@ -32,10 +32,18 @@ final class MachineStore {
 
     func addRemote(host: String, user: String, name: String?) {
         let display = (name?.isEmpty == false ? name! : host)
-        let m = Machine(name: display, kind: .remote, host: host, user: user, os: .linux)
+        let m = Machine(name: display, kind: .remote, host: host, user: user, os: .unknown)
         machines.append(m)
         saveRemotes()
-        Task { await refresh(m) }
+        Task {
+            // Detect the OS once, persist it, then fetch telemetry.
+            let os = await SSHRunner(host: host, user: user).detectOS()
+            if let idx = machines.firstIndex(where: { $0.id == m.id }) {
+                machines[idx].os = os
+                saveRemotes()
+                await refresh(machines[idx])
+            }
+        }
     }
 
     func remove(_ machine: Machine) {
@@ -56,7 +64,7 @@ final class MachineStore {
             if machine.kind == .local {
                 t = LocalTelemetry.snapshot()
             } else {
-                t = try await RemoteLinuxSource(ssh: SSHRunner(host: machine.host, user: machine.user)).snapshot()
+                t = try await RemoteSource(ssh: SSHRunner(host: machine.host, user: machine.user), os: machine.os).snapshot()
             }
             telemetry[machine.id] = t
             online[machine.id] = true
