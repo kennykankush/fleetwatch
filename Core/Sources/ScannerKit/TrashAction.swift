@@ -1,6 +1,6 @@
 import Foundation
 
-/// The only deletion primitive in Stockpile. Nothing is ever `rm`'d —
+/// The only deletion primitive in Fleetwatch. Nothing is ever `rm`'d —
 /// items go to the Trash, recoverable, and the caller records it in the
 /// Ledger.
 public enum TrashAction {

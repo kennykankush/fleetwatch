@@ -6,7 +6,7 @@
     <true/>
     <key>com.apple.security.application-groups</key>
     <array>
-        <string>483LU3J5WJ.com.hadimulia.stockpile</string>
+        <string>483LU3J5WJ.com.hadimulia.fleetwatch</string>
     </array>
 </dict>
 </plist>

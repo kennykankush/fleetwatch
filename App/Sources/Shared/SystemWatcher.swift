@@ -52,7 +52,7 @@ final class SystemWatcher {
         // Thermal — worsening into serious/critical.
         let thermalRank = ThermalLevel(ProcessInfo.processInfo.thermalState).rank
         if thermalRank > lastThermalRank, thermalRank >= ThermalLevel.serious.rank {
-            await notify("Running hot", "Thermal pressure rose. Open Stockpile → Heat to see what's driving it.",
+            await notify("Running hot", "Thermal pressure rose. Open Fleetwatch → Heat to see what's driving it.",
                          ledger: "Thermal crossed into rank \(thermalRank)")
         }
         lastThermalRank = thermalRank
@@ -62,7 +62,7 @@ final class SystemWatcher {
             let hot = disk.physicalUsedFraction >= 0.90
             if hot && !lastDiskHot {
                 await notify("Disk almost full",
-                             "\(disk.physicalUsedFraction.formatted(.percent.precision(.fractionLength(0)))) used. Stockpile → Caches has reclaimable space.",
+                             "\(disk.physicalUsedFraction.formatted(.percent.precision(.fractionLength(0)))) used. Fleetwatch → Caches has reclaimable space.",
                              ledger: "Disk crossed 90% used")
             }
             lastDiskHot = hot

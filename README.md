@@ -1,14 +1,14 @@
 <div align="center">
-    <h1>📦 Stockpile</h1>
+    <h1>📦 Fleetwatch</h1>
     <p><b>Your disk, explained — not just displayed.</b></p>
 </div>
 
 ![Platform](https://img.shields.io/badge/platform-macOS%2026%2B-blue?style=flat-square)
 ![Swift](https://img.shields.io/badge/Swift-6-F05138?style=flat-square)
-![License](https://img.shields.io/github/license/kennykankush/stockpile?style=flat-square)
+![License](https://img.shields.io/github/license/kennykankush/fleetwatch?style=flat-square)
 ![Status](https://img.shields.io/badge/status-pre--release-orange?style=flat-square)
 
-Stockpile is a storage transparency app for macOS. Every gig gets a name in
+Fleetwatch is a storage transparency app for macOS. Every gig gets a name in
 plain words, a reason it exists, and a verdict on whether it's safe to let go.
 No treemaps. No scare tactics. No "247 issues found!". It informs — you decide.
 
@@ -21,19 +21,19 @@ is exactly how this app got born.
 **Homebrew** (the repo is its own tap):
 
 ```sh
-brew tap kennykankush/stockpile https://github.com/kennykankush/stockpile
-brew trust kennykankush/stockpile   # newer Homebrew requires this for third-party taps
-brew install --cask stockpile
+brew tap kennykankush/fleetwatch https://github.com/kennykankush/fleetwatch
+brew trust kennykankush/fleetwatch   # newer Homebrew requires this for third-party taps
+brew install --cask fleetwatch
 ```
 
 **Installer script:**
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/kennykankush/stockpile/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/kennykankush/fleetwatch/main/scripts/install.sh | sh
 ```
 
-**Manual:** grab `Stockpile-x.y.z.zip` from the
-[latest release](https://github.com/kennykankush/stockpile/releases/latest),
+**Manual:** grab `Fleetwatch-x.y.z.zip` from the
+[latest release](https://github.com/kennykankush/fleetwatch/releases/latest),
 unzip, drop into Applications. Signed with Developer ID and notarized by
 Apple — it opens with no warnings.
 
@@ -76,7 +76,7 @@ Apple — it opens with no warnings.
 
 ## The safety model
 
-The rules registry is **allowlist-only**: Stockpile can only suggest clearing
+The rules registry is **allowlist-only**: Fleetwatch can only suggest clearing
 paths a versioned rule explicitly recognizes — with guards like *`node_modules`
 only counts beside a `package.json`*. Anything unrecognized is your data and is
 untouchable, no matter how large. Nothing is ever `rm`'d: Trash only, every
@@ -91,8 +91,8 @@ background daemons. An anti-bloat app must not be bloat.
 
 ```sh
 brew install xcodegen
-git clone https://github.com/kennykankush/stockpile && cd stockpile
-xcodegen generate && open Stockpile.xcodeproj
+git clone https://github.com/kennykankush/fleetwatch && cd fleetwatch
+xcodegen generate && open Fleetwatch.xcodeproj
 ```
 
 Core logic lives in `Core/` as a headless, tested Swift package
@@ -104,7 +104,7 @@ catalog), `LedgerKit` (the memory).
 
 **Why does Finder say I have way more free space than `df` does?**
 Purgeable space. macOS promises it can auto-delete certain caches when space
-runs low, and Finder counts that promise as free space. Stockpile shows both
+runs low, and Finder counts that promise as free space. Fleetwatch shows both
 numbers so you're never lied to. This exact confusion is the app's origin
 story.
 
@@ -122,7 +122,7 @@ sums can slightly exceed true usage. macOS exposes no API to see clone
 sharing — anyone claiming clone-exact numbers is guessing.
 
 **Why no treemap?**
-Treemaps show you bytes. Stockpile shows you *meaning*. If you want rectangles,
+Treemaps show you bytes. Fleetwatch shows you *meaning*. If you want rectangles,
 GrandPerspective is excellent.
 
 ## License

@@ -9,7 +9,7 @@ struct ReclaimableIndexTests {
     /// and a dev tree with a real node_modules and an impostor.
     private func makeFixtureHome() throws -> URL {
         let fm = FileManager.default
-        let home = fm.temporaryDirectory.appending(path: "stockpile-home-\(UUID().uuidString)")
+        let home = fm.temporaryDirectory.appending(path: "fleetwatch-home-\(UUID().uuidString)")
 
         try fm.createDirectory(at: home.appending(path: "Library/Caches/com.spotify.client"), withIntermediateDirectories: true)
         try Data(repeating: 1, count: 4096).write(to: home.appending(path: "Library/Caches/com.spotify.client/blob"))

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Persistent, mtime-validated size cache — the reason Stockpile stays cheap.
+/// Persistent, mtime-validated size cache — the reason Fleetwatch stays cheap.
 ///
 /// Policy: a measurement is trusted while the entry's modification time is
 /// unchanged, or until the user refreshes. Directory mtimes only change on
@@ -34,7 +34,7 @@ public actor SizeCache {
             self.fileURL = fileURL
         } else {
             let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appending(path: "Stockpile")
+                .appending(path: "Fleetwatch")
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             self.fileURL = dir.appending(path: "sizecache.json")
         }

@@ -1,6 +1,6 @@
 import Foundation
 
-/// The versioned allowlist of everything Stockpile recognizes as reclaimable.
+/// The versioned allowlist of everything Fleetwatch recognizes as reclaimable.
 ///
 /// Matching is allowlist-only by design: an unmatched path is user data and
 /// must never be suggested for deletion, no matter how large.

@@ -89,7 +89,7 @@ final class ReclaimableModel {
     }
 }
 
-/// The cache sector: everything Stockpile recognizes as reclaimable,
+/// The cache sector: everything Fleetwatch recognizes as reclaimable,
 /// found for you — no descending required.
 struct CachesView: View {
     @State private var model = ReclaimableModel.shared

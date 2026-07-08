@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct StockpileApp: App {
+struct FleetwatchApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()

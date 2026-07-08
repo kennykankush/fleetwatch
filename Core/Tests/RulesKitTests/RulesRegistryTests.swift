@@ -41,7 +41,7 @@ struct RulesRegistryTests {
     func nodeModulesNeedsSibling() throws {
         let registry = try RulesRegistry.bundled()
         let fm = FileManager.default
-        let root = fm.temporaryDirectory.appending(path: "stockpile-tests-\(UUID().uuidString)")
+        let root = fm.temporaryDirectory.appending(path: "fleetwatch-tests-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: root) }
 
         // A real JS project: node_modules beside package.json.
@@ -64,7 +64,7 @@ struct RulesRegistryTests {
     func venvNeedsChild() throws {
         let registry = try RulesRegistry.bundled()
         let fm = FileManager.default
-        let root = fm.temporaryDirectory.appending(path: "stockpile-tests-\(UUID().uuidString)")
+        let root = fm.temporaryDirectory.appending(path: "fleetwatch-tests-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: root) }
 
         let realVenv = root.appending(path: "a/.venv")

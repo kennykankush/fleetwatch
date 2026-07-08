@@ -83,7 +83,7 @@ public enum LeftoverLocator {
 }
 
 /// Source-aware uninstall: the correct removal path per origin, Trash-only
-/// for anything Stockpile deletes itself.
+/// for anything Fleetwatch deletes itself.
 public enum UninstallAction {
     /// The result of an uninstall, so the UI can tell the user exactly what
     /// happened — including what was deliberately left for review.

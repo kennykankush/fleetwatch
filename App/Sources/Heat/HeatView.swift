@@ -33,13 +33,13 @@ final class HeatModel {
         guard !isSampling else { return }
         isSampling = true
         let raw = await ThermalMonitor().sample()
-        // Exclude Stockpile's own processes — measuring ourselves shouldn't
+        // Exclude Fleetwatch's own processes — measuring ourselves shouldn't
         // attribute the cost of the measurement as heat the user should quit.
         let ownPID = ProcessInfo.processInfo.processIdentifier
-        let ownBundlePrefix = Bundle.main.bundleIdentifier ?? "com.hadimulia.stockpile"
+        let ownBundlePrefix = Bundle.main.bundleIdentifier ?? "com.hadimulia.fleetwatch"
         let kept = raw.processes.filter { load in
             if load.pid == ownPID { return false }
-            if load.command.localizedCaseInsensitiveContains("Stockpile") { return false }
+            if load.command.localizedCaseInsensitiveContains("Fleetwatch") { return false }
             let bid = NSRunningApplication(processIdentifier: load.pid)?.bundleIdentifier ?? ""
             return !bid.hasPrefix(ownBundlePrefix)
         }
@@ -209,7 +209,7 @@ struct HeatView: View {
     private func contributorList(_ reading: ThermalReading) -> some View {
         let largestShare = reading.processes.map { reading.share(of: $0) }.max() ?? 1
         return VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(text: "Contributors", trailing: "share of active load · excludes Stockpile itself")
+            SectionLabel(text: "Contributors", trailing: "share of active load · excludes Fleetwatch itself")
             Card(padding: 6) {
                 VStack(spacing: 0) {
                     ForEach(Array(model.contributors.enumerated()), id: \.element.id) { index, c in

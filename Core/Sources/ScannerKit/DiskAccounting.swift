@@ -4,7 +4,7 @@ import Foundation
 ///
 /// `physical` counts actual bytes on disk (what `df` reports). `effective`
 /// additionally treats purgeable space — caches macOS will auto-delete under
-/// pressure — as free (what Finder and modern widgets report). Stockpile
+/// pressure — as free (what Finder and modern widgets report). Fleetwatch
 /// always shows both; a meter that silently switches between them is how this
 /// app got born.
 public struct DiskAccounting: Sendable, Equatable {

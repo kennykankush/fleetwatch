@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "StockpileCore",
+    name: "FleetwatchCore",
     platforms: [.macOS(.v26)],
     products: [
         .library(name: "RulesKit", targets: ["RulesKit"]),

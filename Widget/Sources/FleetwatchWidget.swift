@@ -29,7 +29,7 @@ struct DiskEntry: TimelineEntry {
 }
 
 struct DiskProvider: TimelineProvider {
-    private static let groupID = "483LU3J5WJ.com.hadimulia.stockpile"
+    private static let groupID = "483LU3J5WJ.com.hadimulia.fleetwatch"
 
     func placeholder(in context: Context) -> DiskEntry {
         DiskEntry(date: .now, snapshot: .sample)
@@ -73,7 +73,7 @@ struct DiskWidgetView: View {
                 VStack(spacing: 4) {
                     Image(systemName: "shippingbox")
                         .foregroundStyle(accent)
-                    Text("Open Stockpile once")
+                    Text("Open Fleetwatch once")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -197,7 +197,7 @@ struct HonestDiskWidget: Widget {
 }
 
 @main
-struct StockpileWidgets: WidgetBundle {
+struct FleetwatchWidgets: WidgetBundle {
     var body: some Widget {
         HonestDiskWidget()
     }

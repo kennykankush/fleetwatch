@@ -17,10 +17,10 @@ fi
 ./scripts/update-cask.sh
 
 echo "▸ Creating GitHub release v${VERSION}…"
-gh release create "v$VERSION" "build/Stockpile-$VERSION.zip" \
-    --title "Stockpile $VERSION" --generate-notes
+gh release create "v$VERSION" "build/Fleetwatch-$VERSION.zip" \
+    --title "Fleetwatch $VERSION" --generate-notes
 
-git add Casks/stockpile.rb
+git add Casks/fleetwatch.rb
 git commit -m "cask: v$VERSION"
 git push
 

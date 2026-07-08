@@ -1,23 +1,23 @@
 #!/bin/sh
-# Stockpile installer. Downloads the notarized app from GitHub Releases and
+# Fleetwatch installer. Downloads the notarized app from GitHub Releases and
 # installs it to /Applications (or ~/Applications if /Applications isn't writable).
 #
-#   curl -fsSL https://raw.githubusercontent.com/kennykankush/stockpile/main/scripts/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/kennykankush/fleetwatch/main/scripts/install.sh | sh
 #
 # Env:
 #   STOCKPILE_VERSION       version tag to install (default: latest, e.g. v0.1.0)
 #   STOCKPILE_INSTALL_DIR   install directory (default: /Applications)
 set -eu
 
-REPO="kennykankush/stockpile"
-APP="Stockpile.app"
+REPO="kennykankush/fleetwatch"
+APP="Fleetwatch.app"
 
 say() { printf '%s\n' "$*"; }
 err() { printf 'error: %s\n' "$*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || err "required tool not found: $1"; }
 need curl
 
-[ "$(uname -s)" = "Darwin" ] || err "Stockpile is a macOS app (this is $(uname -s))"
+[ "$(uname -s)" = "Darwin" ] || err "Fleetwatch is a macOS app (this is $(uname -s))"
 
 # --- resolve version ------------------------------------------------------
 VERSION="${STOCKPILE_VERSION:-latest}"
@@ -27,7 +27,7 @@ if [ "$VERSION" = "latest" ]; then
   [ -n "$VERSION" ] || err "couldn't resolve the latest release tag"
 fi
 BARE_VERSION="${VERSION#v}"
-URL="https://github.com/$REPO/releases/download/$VERSION/Stockpile-$BARE_VERSION.zip"
+URL="https://github.com/$REPO/releases/download/$VERSION/Fleetwatch-$BARE_VERSION.zip"
 
 # --- pick install dir -----------------------------------------------------
 INSTALL_DIR="${STOCKPILE_INSTALL_DIR:-/Applications}"
@@ -41,11 +41,11 @@ fi
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-say "downloading Stockpile $VERSION…"
-curl -fsSL -o "$TMP/stockpile.zip" "$URL" || err "download failed: $URL"
+say "downloading Fleetwatch $VERSION…"
+curl -fsSL -o "$TMP/fleetwatch.zip" "$URL" || err "download failed: $URL"
 
 say "unpacking…"
-ditto -x -k "$TMP/stockpile.zip" "$TMP/unpacked" || err "unzip failed"
+ditto -x -k "$TMP/fleetwatch.zip" "$TMP/unpacked" || err "unzip failed"
 [ -d "$TMP/unpacked/$APP" ] || err "archive did not contain $APP"
 
 if [ -d "$INSTALL_DIR/$APP" ]; then
@@ -55,4 +55,4 @@ fi
 ditto "$TMP/unpacked/$APP" "$INSTALL_DIR/$APP"
 
 say "✅ installed: $INSTALL_DIR/$APP (notarized — opens with no warnings)"
-say "   open -a Stockpile"
+say "   open -a Fleetwatch"

@@ -7,7 +7,7 @@ struct LedgerStoreTests {
     @Test("Append and read round-trips through disk")
     func roundTrip() async throws {
         let file = FileManager.default.temporaryDirectory
-            .appending(path: "stockpile-ledger-\(UUID().uuidString).json")
+            .appending(path: "fleetwatch-ledger-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: file) }
 
         let store = LedgerStore(fileURL: file)

@@ -56,7 +56,7 @@ final class TrashSentinel {
                 detail: "Left \(leftovers.count) leftover location\(leftovers.count == 1 ? "" : "s") (\(total.bytesFormatted)) — see Apps → Ghosts."))
             let content = UNMutableNotificationContent()
             content.title = "\(name) left leftovers behind"
-            content.body = "\(total.bytesFormatted) of its data is still on disk. Open Stockpile → Apps to clear it."
+            content.body = "\(total.bytesFormatted) of its data is still on disk. Open Fleetwatch → Apps to clear it."
             try? await UNUserNotificationCenter.current().add(
                 UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
         }

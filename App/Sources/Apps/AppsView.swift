@@ -179,12 +179,18 @@ struct AppsView: View {
             .buttonStyle(.plain)
 
             if ghostsExpanded {
-                VStack(spacing: 2) {
-                    ForEach(model.orphans) { orphan in
-                        GhostRow(orphan: orphan) { Task { await model.clearOrphan(orphan) } }
+                // Bounded + independently scrollable, so a long ghost list can
+                // never overflow the window and swallow the header/list below.
+                ScrollView {
+                    VStack(spacing: 2) {
+                        ForEach(model.orphans) { orphan in
+                            GhostRow(orphan: orphan) { Task { await model.clearOrphan(orphan) } }
+                        }
                     }
+                    .padding(.horizontal, 28).padding(.bottom, 12)
                 }
-                .padding(.horizontal, 28).padding(.bottom, 12)
+                .frame(maxHeight: 300)
+                .scrollIndicators(.visible)
             }
         }
     }

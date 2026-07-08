@@ -1,6 +1,6 @@
 import Foundation
 
-/// Stockpile's philosophy, made load-bearing. Every organ tells the same
+/// Fleetwatch's philosophy, made load-bearing. Every organ tells the same
 /// story: a *naive* number people are shown, an *honest* number that's true,
 /// and the caveat bridging them — plus whether it was measured or estimated.
 /// Disk (physical vs effective), Heat (state vs CPU-share), Memory (used vs

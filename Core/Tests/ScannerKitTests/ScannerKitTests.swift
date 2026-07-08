@@ -24,7 +24,7 @@ struct DirectoryScannerTests {
     @Test("Sizes children and annotates recognized directories")
     func scanFixture() async throws {
         let fm = FileManager.default
-        let root = fm.temporaryDirectory.appending(path: "stockpile-scan-\(UUID().uuidString)")
+        let root = fm.temporaryDirectory.appending(path: "fleetwatch-scan-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: root) }
 
         // project/node_modules (recognized, 🟡) beside package.json,
@@ -59,7 +59,7 @@ struct DirectoryScannerTests {
     @Test("Symlinks are counted as zero, never followed")
     func symlinksNotFollowed() async throws {
         let fm = FileManager.default
-        let root = fm.temporaryDirectory.appending(path: "stockpile-link-\(UUID().uuidString)")
+        let root = fm.temporaryDirectory.appending(path: "fleetwatch-link-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: root) }
 
         let big = root.appending(path: "big")

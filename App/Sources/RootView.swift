@@ -50,7 +50,7 @@ struct RootView: View {
                     Image(systemName: "shippingbox.fill")
                         .font(.body)
                         .foregroundStyle(Theme.accent)
-                    Text("Stockpile")
+                    Text("Fleetwatch")
                         .font(.system(size: 15, weight: .semibold))
                     Spacer()
                 }

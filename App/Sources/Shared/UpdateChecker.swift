@@ -19,7 +19,7 @@ final class UpdateChecker {
     func checkIfNeeded() async {
         guard !checked else { return }
         checked = true
-        guard let url = URL(string: "https://api.github.com/repos/kennykankush/stockpile/releases/latest") else { return }
+        guard let url = URL(string: "https://api.github.com/repos/kennykankush/fleetwatch/releases/latest") else { return }
         var request = URLRequest(url: url)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         guard let (data, _) = try? await URLSession.shared.data(for: request),
@@ -54,14 +54,14 @@ struct UpdateBanner: View {
             HStack(spacing: 10) {
                 IconTile(symbol: "arrow.down.circle", tint: Theme.accent, size: 30)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Stockpile \(version) is available")
+                    Text("Fleetwatch \(version) is available")
                         .font(.system(size: 13, weight: .semibold))
-                    Text("Update with: brew upgrade --cask stockpile")
+                    Text("Update with: brew upgrade --cask fleetwatch")
                         .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button(copied ? "Copied ✓" : "Copy command") {
-                    SystemReport.copyToClipboard("brew upgrade --cask stockpile")
+                    SystemReport.copyToClipboard("brew upgrade --cask fleetwatch")
                     copied = true
                 }
                 .buttonStyle(.bordered).controlSize(.small)

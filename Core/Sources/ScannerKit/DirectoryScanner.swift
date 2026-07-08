@@ -15,7 +15,7 @@ public struct ScannedEntry: Sendable, Identifiable, Hashable {
     public let sizeBytes: Int64
     /// When this size was measured — from cache, this can be in the past.
     public let measuredAt: Date
-    /// The matched rule, if Stockpile recognizes this entry. nil = user data.
+    /// The matched rule, if Fleetwatch recognizes this entry. nil = user data.
     public let rule: Rule?
 }
 

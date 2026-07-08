@@ -1,6 +1,6 @@
 import Foundation
 
-/// One recorded moment: a measurement, or an action Stockpile took.
+/// One recorded moment: a measurement, or an action Fleetwatch took.
 public struct LedgerEvent: Codable, Sendable, Identifiable, Hashable {
     public enum Kind: String, Codable, Sendable {
         /// A disk snapshot (taken at most once per app launch).
@@ -47,7 +47,7 @@ public actor LedgerStore {
             self.fileURL = fileURL
         } else {
             let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appending(path: "Stockpile")
+                .appending(path: "Fleetwatch")
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             self.fileURL = dir.appending(path: "ledger.json")
         }

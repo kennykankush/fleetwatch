@@ -1,7 +1,7 @@
 import SwiftUI
 import RulesKit
 
-/// Stockpile's design tokens — the Linear/Raycast school: an opaque
+/// Fleetwatch's design tokens — the Linear/Raycast school: an opaque
 /// near-black surface ladder for depth (no shadows, no glows), hairline
 /// borders, typography doing the drama, color doing almost nothing.
 enum Theme {

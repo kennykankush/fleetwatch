@@ -29,7 +29,7 @@ enum RunningApps {
 /// Shares the honest numbers with the widget via the App Group container.
 /// Harmless no-op until the group entitlement exists.
 enum WidgetBridge {
-    static let groupID = "483LU3J5WJ.com.hadimulia.stockpile"
+    static let groupID = "483LU3J5WJ.com.hadimulia.fleetwatch"
 
     struct Snapshot: Codable {
         let date: Date
@@ -113,7 +113,7 @@ struct SetupCard: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Grant Full Disk Access — once")
                             .font(.system(size: 13, weight: .semibold))
-                        Text("Lets Stockpile measure protected folders (Mail, Safari, some caches). One grant in System Settings; Stockpile never asks again.")
+                        Text("Lets Fleetwatch measure protected folders (Mail, Safari, some caches). One grant in System Settings; Fleetwatch never asks again.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

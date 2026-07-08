@@ -6,7 +6,7 @@ import Testing
 struct SizeCacheTests {
     private func tempFile() -> URL {
         FileManager.default.temporaryDirectory
-            .appending(path: "stockpile-cache-\(UUID().uuidString).json")
+            .appending(path: "fleetwatch-cache-\(UUID().uuidString).json")
     }
 
     @Test("Hit requires an exact mtime match")
