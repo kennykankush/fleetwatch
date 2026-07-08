@@ -39,7 +39,8 @@ struct RootView: View {
     @State private var addingMachine = false
 
     init() {
-        _focusedMachineID = State(initialValue: MachineStore.shared.local.id)
+        // Land on the Fleet grid — it refreshes every machine on appear.
+        _focusedMachineID = State(initialValue: nil)
     }
 
     static var appVersion: String {

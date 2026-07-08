@@ -20,7 +20,8 @@ public enum WindowsProbe {
     """
 
     public static func parse(_ output: String) -> MachineTelemetry? {
-        let s = splitSections(output)
+        // PowerShell over SSH emits CRLF — normalize before anything else.
+        let s = splitSections(output.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n"))
         guard let mem = s["MEM"]?.first, let disk = s["DISK"]?.first,
               let cpuLines = s["CPU"], cpuLines.count >= 1 else { return nil }
 

@@ -61,4 +61,13 @@ struct WindowsProbeTests {
         #expect(!t.hasBattery)
         #expect(t.containers.isEmpty)
     }
+
+    @Test("CRLF line endings parse — PowerShell over SSH emits \\r\\n")
+    func crlf() throws {
+        let crlf = Self.realOutput.replacingOccurrences(of: "\n", with: "\r\n")
+        let t = try #require(WindowsProbe.parse(crlf), "CRLF output must parse — this is what the real box sends")
+        #expect(t.hardware.cores == 16)
+        #expect(t.memTotal == 33474540 * 1024)
+        #expect(t.diskTotal == 998324412416)
+    }
 }
