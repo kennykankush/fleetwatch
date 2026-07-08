@@ -59,17 +59,31 @@ final class MachineStore {
         guard !refreshing.contains(machine.id) else { return }
         refreshing.insert(machine.id)
         defer { refreshing.remove(machine.id) }
+        if machine.kind == .local {
+            telemetry[machine.id] = LocalTelemetry.snapshot()
+            online[machine.id] = true
+            return
+        }
+        let ssh = SSHRunner(host: machine.host, user: machine.user)
         do {
-            let t: MachineTelemetry
-            if machine.kind == .local {
-                t = LocalTelemetry.snapshot()
-            } else {
-                t = try await RemoteSource(ssh: SSHRunner(host: machine.host, user: machine.user), os: machine.os).snapshot()
-            }
-            telemetry[machine.id] = t
+            telemetry[machine.id] = try await RemoteSource(ssh: ssh, os: machine.os).snapshot()
             online[machine.id] = true
             lastError[machine.id] = nil
         } catch {
+            // The probe failed — the stored OS may be stale/wrong (e.g. a
+            // Windows box saved as Linux by an older build). Re-detect and
+            // retry once before giving up.
+            let freshOS = await ssh.detectOS()
+            if freshOS != machine.os, let idx = machines.firstIndex(where: { $0.id == machine.id }) {
+                machines[idx].os = freshOS
+                saveRemotes()
+                do {
+                    telemetry[machine.id] = try await RemoteSource(ssh: ssh, os: freshOS).snapshot()
+                    online[machine.id] = true
+                    lastError[machine.id] = nil
+                    return
+                } catch { }
+            }
             online[machine.id] = false
             lastError[machine.id] = error.localizedDescription
         }
