@@ -1,8 +1,10 @@
 #!/bin/bash
 # Fleetwatch release pipeline: archive → export (Developer ID) → notarize → staple → zip
-# One-time setup: xcrun notarytool store-credentials fleetwatch \
+# Notary credential lives in a keychain profile; override with NOTARY_PROFILE.
+# One-time setup: xcrun notarytool store-credentials "$NOTARY_PROFILE" \
 #   --apple-id <apple-id> --team-id 483LU3J5WJ --password <app-specific-password>
 set -euo pipefail
+NOTARY_PROFILE="${NOTARY_PROFILE:-stockpile}"
 
 cd "$(dirname "$0")/.."
 VERSION=$(grep -m1 MARKETING_VERSION project.yml | awk '{print $2}' | tr -d '"')
@@ -43,7 +45,7 @@ if [ "${SKIP_NOTARIZE:-0}" = "1" ]; then
 fi
 
 echo "▸ Submitting to Apple notary service (waits for verdict)…"
-xcrun notarytool submit "$ZIP" --keychain-profile fleetwatch --wait
+xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
 
 echo "▸ Stapling ticket to the app…"
 xcrun stapler staple "$APP"
