@@ -13,5 +13,7 @@ cask "fleetwatch" do
 
   zap trash: [
     "~/Library/Application Support/Fleetwatch",
+    "~/Library/Preferences/com.hadimulia.fleetwatch.plist",
+    "~/Library/Group Containers/483LU3J5WJ.com.hadimulia.fleetwatch",
   ]
 end
