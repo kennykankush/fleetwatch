@@ -1,6 +1,6 @@
 cask "fleetwatch" do
-  version "0.8.0"
-  sha256 "4adaab785cbace4c365c600d70237f49b3189b99e8057afdb8ae5794a8716052"
+  version "0.8.1"
+  sha256 "876906798cb52fff7b83be1836db4429cccddce2e2f80234ed3b996f4cb2bb93"
 
   url "https://github.com/kennykankush/fleetwatch/releases/download/v#{version}/Fleetwatch-#{version}.zip"
   name "Fleetwatch"
