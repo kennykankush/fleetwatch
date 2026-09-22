@@ -103,6 +103,7 @@ struct RootView: View {
             // you're not currently viewing.
             while !Task.isCancelled {
                 await store.refreshAll()
+                WidgetBridge.exportFleet(store.strength(clouds: CloudStore.shared.drives))
                 try? await Task.sleep(for: .seconds(60))
             }
         }

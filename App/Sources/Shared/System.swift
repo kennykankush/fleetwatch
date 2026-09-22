@@ -4,6 +4,7 @@ import WidgetKit
 import ThermalKit
 import MemoryKit
 import BatteryKit
+import FleetKit
 
 /// Who's running — the "quit Spotify before clearing its cache" guard.
 enum RunningApps {
@@ -62,6 +63,60 @@ enum WidgetBridge {
         try? FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
         if let data = try? JSONEncoder().encode(snapshot) {
             try? data.write(to: container.appending(path: "snapshot.json"), options: .atomic)
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
+
+    /// The fleet's strength, for the fleet widget. Written to its own file so
+    /// it never has to merge with — or clobber — the local disk snapshot.
+    struct FleetSnapshot: Codable, Hashable {
+        var date: Date
+        var storageTotal: Int64
+        var storageUsed: Int64
+        var machineStorage: Int64
+        var cloudStorage: Int64
+        var cores: Int
+        var ram: Int64
+        var machines: Int
+        var reachable: Int
+        var clouds: Int
+        var alerts: Int
+        var stale: Int
+    }
+
+    /// The last payload written, so a 60-second heartbeat that found nothing
+    /// new doesn't wake every widget timeline for no reason.
+    @MainActor private static var lastFleet: FleetSnapshot?
+
+    @MainActor
+    static func exportFleet(_ s: FleetStrength) {
+        guard let container = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: groupID
+        ) else { return }
+        var snapshot = FleetSnapshot(
+            date: .now,
+            storageTotal: s.owned.storage,
+            storageUsed: s.owned.storageUsed,
+            machineStorage: s.machines.storage,
+            cloudStorage: s.cloud.storage,
+            cores: s.owned.cores,
+            ram: s.owned.ram,
+            machines: s.machineCount,
+            reachable: s.reachableCount,
+            clouds: s.cloudCount,
+            alerts: s.alerts,
+            stale: s.staleCount
+        )
+        // Compare on everything but the timestamp.
+        if var previous = lastFleet {
+            previous.date = snapshot.date
+            if previous == snapshot { return }
+        }
+        lastFleet = snapshot
+        snapshot.date = .now
+        try? FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+        if let data = try? JSONEncoder().encode(snapshot) {
+            try? data.write(to: container.appending(path: "fleet.json"), options: .atomic)
             WidgetCenter.shared.reloadAllTimelines()
         }
     }
