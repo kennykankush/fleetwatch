@@ -194,3 +194,63 @@ struct CloudProbeTests {
         #expect(CloudProbe.parse(#"{"other": 1}"#) == nil)
     }
 }
+
+@Suite("rclone remote discovery")
+struct CloudRemoteTests {
+    // Shape of `rclone listremotes --json` (rclone 1.75).
+    static let json = """
+    [
+      {"name":"gdrive","type":"drive","description":"Google Drive"},
+      {"name":"onedrive","type":"onedrive","description":"Microsoft OneDrive"},
+      {"name":"jotta","type":"jottacloud","description":"Jottacloud"},
+      {"name":"bucket","type":"s3","description":"Amazon S3"}
+    ]
+    """
+
+    @Test("Parses names, backend types and descriptions")
+    func parses() {
+        let r = CloudProbe.parseRemotes(Self.json)
+        #expect(r.count == 4)
+        #expect(r[0].name == "gdrive")
+        #expect(r[0].type == "drive")
+        #expect(r[0].path == "gdrive:")        // what `rclone about` wants
+        #expect(r[2].description == "Jottacloud")
+    }
+
+    @Test("An empty config yields no remotes, not a crash")
+    func empty() {
+        #expect(CloudProbe.parseRemotes("[\n]").isEmpty)
+        #expect(CloudProbe.parseRemotes("not json").isEmpty)
+    }
+
+    @Test("A remote already ending in a colon isn't given a second one")
+    func noDoubleColon() {
+        #expect(CloudProbe.Remote(name: "gdrive:", type: "drive", description: "x").path == "gdrive:")
+    }
+
+    @Test("Backend types map onto styled providers; unknown ones still work")
+    func providerMapping() {
+        #expect(CloudDrive.Provider.from(rcloneType: "drive") == .googleDrive)
+        #expect(CloudDrive.Provider.from(rcloneType: "onedrive") == .oneDrive)
+        #expect(CloudDrive.Provider.from(rcloneType: "b2") == .backblaze)
+        #expect(CloudDrive.Provider.from(rcloneType: "iclouddrive") == .iCloud)
+        #expect(CloudDrive.Provider.from(rcloneType: "DRIVE") == .googleDrive)   // case-insensitive
+        // One of rclone's ~70 backends we never taught it — lands on .other
+        // and keeps rclone's own label rather than reading "Cloud storage".
+        #expect(CloudDrive.Provider.from(rcloneType: "jottacloud") == .other)
+        let d = CloudDrive(name: "Jotta", provider: .other, capacity: 100, backend: "Jottacloud")
+        #expect(d.backendLabel == "Jottacloud")
+    }
+
+    @Test("S3 is known not to report usage, so we don't pretend to probe it")
+    func s3CannotReport() {
+        #expect(!CloudDrive.Provider.s3.canReportUsage)
+        #expect(CloudDrive.Provider.googleDrive.canReportUsage)
+        #expect(CloudDrive.Provider.oneDrive.canReportUsage)
+    }
+
+    @Test("A drive with no backend label falls back to its provider name")
+    func labelFallback() {
+        #expect(CloudDrive(name: "x", provider: .dropbox, capacity: 1).backendLabel == "Dropbox")
+    }
+}

@@ -3,10 +3,11 @@ import FleetKit
 
 /// Declare a cloud drive so its capacity counts toward the fleet.
 ///
-/// Capacity is typed in, not discovered: the sync clients mount through File
-/// Provider, so the OS reports the local disk rather than the plan. If
-/// `rclone` is configured, pointing this at a remote lets the provider answer
-/// for itself instead.
+/// Two ways in. If you have `rclone` remotes configured, pick one and the
+/// provider answers for itself — name, backend, capacity and usage all
+/// arrive from `rclone about`, and nothing is typed. Otherwise you state the
+/// plan size yourself, because the sync clients mount through File Provider
+/// and the OS reports your local disk rather than the plan.
 struct AddCloudView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var store = CloudStore.shared
@@ -18,7 +19,11 @@ struct AddCloudView: View {
     @State private var provider: CloudDrive.Provider = .googleDrive
     @State private var amount = ""
     @State private var unit: Unit = .tb
-    @State private var remote = ""
+    @State private var remote = ""              // rclone remote name, "" = none
+    @State private var backend: String?
+    @State private var measuredUsed: Int64?
+    @State private var probing = false
+    @State private var probeError: String?
 
     private enum Unit: String, CaseIterable, Identifiable {
         case gb = "GB", tb = "TB"
@@ -31,28 +36,38 @@ struct AddCloudView: View {
     }
 
     private var isValid: Bool { !name.isEmpty && capacityBytes > 0 }
+    private var isLinked: Bool { !remote.isEmpty }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(editing == nil ? "Add cloud storage" : "Edit cloud storage")
                     .font(.system(size: 17, weight: .semibold))
-                Text("Counts toward the fleet's total capacity. No sign-in — the plan size is yours to state.")
-                    .font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text("Counts toward the fleet's total capacity.")
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+
+            if store.rcloneAvailable && !store.availableRemotes.isEmpty {
+                remoteSection
+                Divider().overlay(Theme.hairline)
+            } else {
+                rcloneHint
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                VStack(alignment: .leading, spacing: 4) {
-                    fieldLabel("Provider")
-                    Picker("", selection: $provider) {
-                        ForEach(CloudDrive.Provider.allCases) { p in
-                            Label(p.displayName, systemImage: p.symbol).tag(p)
+                if !isLinked {
+                    VStack(alignment: .leading, spacing: 4) {
+                        fieldLabel("Provider")
+                        Picker("", selection: $provider) {
+                            ForEach(CloudDrive.Provider.allCases) { p in
+                                Label(p.displayName, systemImage: p.symbol).tag(p)
+                            }
                         }
-                    }
-                    .labelsHidden().pickerStyle(.menu)
-                    .onChange(of: provider) { _, new in
-                        if name.isEmpty || CloudDrive.Provider.allCases.contains(where: { $0.displayName == name }) {
-                            name = new.displayName
+                        .labelsHidden().pickerStyle(.menu)
+                        .onChange(of: provider) { _, new in
+                            if name.isEmpty || CloudDrive.Provider.allCases.contains(where: { $0.displayName == name }) {
+                                name = new.displayName
+                            }
                         }
                     }
                 }
@@ -60,7 +75,7 @@ struct AddCloudView: View {
                 field("Name", "Google Drive — personal", text: $name)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    fieldLabel("Plan capacity")
+                    fieldLabel(isLinked ? "Plan capacity — reported by the provider" : "Plan capacity")
                     HStack(spacing: 8) {
                         TextField("4", text: $amount)
                             .textFieldStyle(.plain).font(.system(size: 13)).monospacedDigit()
@@ -77,27 +92,6 @@ struct AddCloudView: View {
                             .font(.system(size: 11)).foregroundStyle(Theme.inkTertiary).monospacedDigit()
                     }
                 }
-
-                if store.rcloneAvailable {
-                    VStack(alignment: .leading, spacing: 4) {
-                        fieldLabel("Live usage via rclone (optional)")
-                        Picker("", selection: $remote) {
-                            Text("Don't measure").tag("")
-                            ForEach(store.availableRemotes, id: \.self) { Text($0).tag($0) }
-                        }
-                        .labelsHidden().pickerStyle(.menu)
-                        Text("Fleetwatch reads your existing rclone config. It never stores a cloud credential.")
-                            .font(.system(size: 10.5)).foregroundStyle(Theme.inkTertiary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                } else {
-                    HStack(spacing: 7) {
-                        Image(systemName: "info.circle").font(.system(size: 11)).foregroundStyle(Theme.inkTertiary)
-                        Text("Install rclone to read live usage. Without it, capacity still counts.")
-                            .font(.system(size: 11)).foregroundStyle(Theme.inkTertiary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
             }
 
             HStack {
@@ -109,7 +103,7 @@ struct AddCloudView: View {
             }
         }
         .padding(24)
-        .frame(width: 460)
+        .frame(width: 470)
         .background(Theme.canvas)
         .task {
             if let d = editing { load(d) }
@@ -117,17 +111,111 @@ struct AddCloudView: View {
         }
     }
 
+    // MARK: rclone
+
+    private var remoteSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            fieldLabel("Read from an rclone remote")
+            Picker("", selection: $remote) {
+                Text("Don't link — I'll enter it myself").tag("")
+                ForEach(store.availableRemotes) { r in
+                    Text("\(r.name)  ·  \(r.description)").tag(r.name)
+                }
+            }
+            .labelsHidden().pickerStyle(.menu)
+            .onChange(of: remote) { _, new in
+                Task { await link(new) }
+            }
+
+            if probing {
+                HStack(spacing: 7) {
+                    ProgressView().controlSize(.small)
+                    Text("Asking \(remote) for its quota…")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+            } else if let probeError {
+                HStack(alignment: .top, spacing: 7) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11)).foregroundStyle(Theme.metricHeat)
+                    Text(probeError).font(.system(size: 11)).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else if isLinked, let used = measuredUsed {
+                HStack(spacing: 7) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 11)).foregroundStyle(Theme.ok)
+                    Text("\(backend ?? provider.displayName) reports \(capacityBytes.bytesFormatted) · \(used.bytesFormatted) used")
+                        .font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
+                }
+            } else {
+                Text("rclone holds the credentials — Fleetwatch never sees them.")
+                    .font(.system(size: 10.5)).foregroundStyle(Theme.inkTertiary)
+            }
+        }
+    }
+
+    private var rcloneHint: some View {
+        HStack(alignment: .top, spacing: 7) {
+            Image(systemName: "info.circle").font(.system(size: 11)).foregroundStyle(Theme.inkTertiary)
+            Text(store.rcloneAvailable
+                 ? "No rclone remotes configured yet. Run `rclone config` to link an account and the capacity fills itself in."
+                 : "Install rclone and link an account to read capacity and usage automatically. Without it, declare the plan below — it still counts.")
+                .font(.system(size: 11)).foregroundStyle(Theme.inkTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// Picking a remote fills in everything it can: the backend's own label,
+    /// a matching provider, and the real capacity/usage from `rclone about`.
+    private func link(_ remoteName: String) async {
+        probeError = nil
+        guard !remoteName.isEmpty else { backend = nil; measuredUsed = nil; return }
+        guard let r = store.availableRemotes.first(where: { $0.name == remoteName }) else { return }
+
+        provider = CloudDrive.Provider.from(rcloneType: r.type)
+        backend = r.description
+        if name.isEmpty || CloudDrive.Provider.allCases.contains(where: { $0.displayName == name }) {
+            name = r.description
+        }
+
+        guard provider.canReportUsage else {
+            probeError = "\(r.description) doesn't report usage — enter the capacity yourself."
+            return
+        }
+
+        probing = true
+        defer { probing = false }
+        switch await store.inspect(r) {
+        case .success(let usage):
+            if let total = usage.total, total > 0 { setCapacity(total) }
+            measuredUsed = usage.used
+            if usage.total == nil {
+                probeError = "\(r.description) reported usage but not a plan size — enter the capacity yourself."
+            }
+        case .failure(let error):
+            probeError = error.localizedDescription
+        }
+    }
+
+    private func setCapacity(_ bytes: Int64) {
+        if bytes >= Unit.tb.multiplier {
+            unit = .tb
+            amount = trimmed(Double(bytes) / Double(Unit.tb.multiplier))
+        } else {
+            unit = .gb
+            amount = trimmed(Double(bytes) / Double(Unit.gb.multiplier))
+        }
+    }
+
+    // MARK: load / save
+
     private func load(_ d: CloudDrive) {
         name = d.name
         provider = d.provider
-        remote = d.rcloneRemote ?? ""
-        if d.capacity >= Unit.tb.multiplier {
-            unit = .tb
-            amount = trimmed(Double(d.capacity) / Double(Unit.tb.multiplier))
-        } else {
-            unit = .gb
-            amount = trimmed(Double(d.capacity) / Double(Unit.gb.multiplier))
-        }
+        remote = (d.rcloneRemote ?? "").replacingOccurrences(of: ":", with: "")
+        backend = d.backend
+        measuredUsed = d.used
+        setCapacity(d.capacity)
     }
 
     /// "4" not "4.0"; "1.5" stays "1.5".
@@ -136,20 +224,27 @@ struct AddCloudView: View {
     }
 
     private func commit() {
+        let linkedRemote = remote.isEmpty ? nil : remote
         if var d = editing {
             d.name = name
             d.provider = provider
             d.capacity = capacityBytes
-            d.rcloneRemote = remote.isEmpty ? nil : remote
+            d.rcloneRemote = linkedRemote
+            d.backend = backend
+            if let measuredUsed { d.used = measuredUsed; d.lastMeasured = Date() }
             store.update(d)
-            if !remote.isEmpty { Task { await store.refresh(d) } }
         } else {
             store.add(CloudDrive(name: name, provider: provider,
                                  capacity: capacityBytes,
-                                 rcloneRemote: remote.isEmpty ? nil : remote))
+                                 used: measuredUsed,
+                                 rcloneRemote: linkedRemote,
+                                 backend: backend,
+                                 lastMeasured: measuredUsed == nil ? nil : Date()))
         }
         dismiss()
     }
+
+    // MARK: chrome
 
     private func fieldLabel(_ text: String) -> some View {
         Text(text.uppercased())

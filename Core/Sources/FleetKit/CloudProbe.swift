@@ -50,12 +50,45 @@ public enum CloudProbe {
 
     public static var isAvailable: Bool { executablePath != nil }
 
-    /// Configured remote names, colon included (`gdrive:`, `onedrive:`).
-    public static func listRemotes() async -> [String] {
-        guard let out = try? await run(["listremotes"]) else { return [] }
-        return out.split(separator: "\n")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
+    /// One configured rclone remote. `type` is the backend identifier
+    /// (`drive`, `onedrive`, `b2`, …) — rclone ships ~70 of them, which is
+    /// how Fleetwatch learns providers it was never taught.
+    public struct Remote: Sendable, Hashable, Identifiable {
+        public let name: String          // "gdrive" (no colon)
+        public let type: String          // "drive"
+        public let description: String   // "Google Drive"
+
+        public var id: String { name }
+        /// The form `rclone about` wants.
+        public var path: String { name.hasSuffix(":") ? name : name + ":" }
+
+        public init(name: String, type: String, description: String) {
+            self.name = name; self.type = type; self.description = description
+        }
+    }
+
+    /// Configured remotes with their backend types, via
+    /// `rclone listremotes --json`.
+    ///
+    /// Deliberately *not* `rclone config dump` — that would print every
+    /// remote's OAuth tokens into this process. `listremotes` returns only
+    /// names, types and descriptions, which is all we need.
+    public static func listRemotes() async -> [Remote] {
+        guard let out = try? await run(["listremotes", "--json"]) else { return [] }
+        return parseRemotes(out)
+    }
+
+    public static func parseRemotes(_ json: String) -> [Remote] {
+        guard let data = json.data(using: .utf8),
+              let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return [] }
+        return rows.compactMap { row in
+            guard let name = row["name"] as? String, !name.isEmpty else { return nil }
+            let type = (row["type"] as? String) ?? ""
+            let described = (row["description"] as? String) ?? ""
+            return Remote(name: name, type: type,
+                          description: described.isEmpty ? type : described)
+        }
     }
 
     /// `rclone about <remote> --json` → parsed quota.

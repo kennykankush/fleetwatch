@@ -14,8 +14,8 @@ final class CloudStore {
     private(set) var drives: [CloudDrive] = []
     var refreshing: Set<UUID> = []
     var lastError: [UUID: String] = [:]
-    /// Remote names from `rclone listremotes`, loaded once on demand.
-    private(set) var availableRemotes: [String] = []
+    /// Configured rclone remotes (name + backend type), loaded on demand.
+    private(set) var availableRemotes: [CloudProbe.Remote] = []
 
     private let key = "fleet.clouds.v1"
 
@@ -78,6 +78,14 @@ final class CloudStore {
         availableRemotes = await CloudProbe.listRemotes()
     }
 
+    /// Asks a remote for its quota *before* a drive exists for it — so the
+    /// add sheet can fill in capacity and usage instead of asking you to
+    /// type a number you'd have to look up.
+    func inspect(_ remote: CloudProbe.Remote) async -> Result<CloudProbe.Usage, Error> {
+        do { return .success(try await CloudProbe.about(remote: remote.path)) }
+        catch { return .failure(error) }
+    }
+
     // MARK: persistence
 
     private func load() -> [CloudDrive] {
@@ -104,6 +112,7 @@ extension CloudDrive.Provider {
         case .box: Theme.metricDisk
         case .mega: Theme.danger
         case .proton: Theme.metricMemory
+        case .pcloud: Theme.ok
         case .s3, .backblaze: Theme.metricCPU
         case .other: Theme.inkTertiary
         }

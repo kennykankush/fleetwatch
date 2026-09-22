@@ -13,7 +13,7 @@ import Foundation
 /// existing `rclone` config.
 public struct CloudDrive: Codable, Sendable, Identifiable, Hashable {
     public enum Provider: String, Codable, Sendable, CaseIterable, Identifiable {
-        case googleDrive, oneDrive, dropbox, iCloud, box, mega, proton, s3, backblaze, other
+        case googleDrive, oneDrive, dropbox, iCloud, box, mega, proton, pcloud, s3, backblaze, other
 
         public var id: String { rawValue }
 
@@ -26,8 +26,9 @@ public struct CloudDrive: Codable, Sendable, Identifiable, Hashable {
             case .box: "Box"
             case .mega: "MEGA"
             case .proton: "Proton Drive"
+            case .pcloud: "pCloud"
             case .s3: "S3"
-            case .backblaze: "Backblaze"
+            case .backblaze: "Backblaze B2"
             case .other: "Cloud storage"
             }
         }
@@ -40,6 +41,31 @@ public struct CloudDrive: Codable, Sendable, Identifiable, Hashable {
             default: "cloud"
             }
         }
+
+        /// Maps an rclone backend identifier onto a provider we have styling
+        /// for. rclone ships ~70 backends; the ones we don't recognise still
+        /// work — they land on `.other` and carry rclone's own description as
+        /// their label, so Fleetwatch learns providers nobody taught it.
+        public static func from(rcloneType: String) -> Provider {
+            switch rcloneType.lowercased() {
+            case "drive": .googleDrive
+            case "onedrive": .oneDrive
+            case "dropbox": .dropbox
+            case "iclouddrive": .iCloud
+            case "box": .box
+            case "mega": .mega
+            case "protondrive": .proton
+            case "pcloud": .pcloud
+            case "s3": .s3
+            case "b2": .backblaze
+            default: .other
+            }
+        }
+
+        /// rclone's feature matrix lists S3 as having no `about` support, so
+        /// a bucket can never report usage. Say so up front instead of
+        /// letting the probe fail and look broken.
+        public var canReportUsage: Bool { self != .s3 }
     }
 
     public let id: UUID
@@ -52,19 +78,30 @@ public struct CloudDrive: Codable, Sendable, Identifiable, Hashable {
     public var used: Int64?
     /// An `rclone` remote name (`gdrive:`) for live reads. Optional.
     public var rcloneRemote: String?
+    /// rclone's own label for the backend ("Jottacloud"), so a provider we
+    /// have no case for still reads as itself instead of "Cloud storage".
+    public var backend: String?
     /// When `used` was last measured by a probe. `nil` when hand-declared.
     public var lastMeasured: Date?
 
     public init(id: UUID = UUID(), name: String, provider: Provider,
                 capacity: Int64, used: Int64? = nil,
-                rcloneRemote: String? = nil, lastMeasured: Date? = nil) {
+                rcloneRemote: String? = nil, backend: String? = nil,
+                lastMeasured: Date? = nil) {
         self.id = id
         self.name = name
         self.provider = provider
         self.capacity = capacity
         self.used = used
         self.rcloneRemote = rcloneRemote
+        self.backend = backend
         self.lastMeasured = lastMeasured
+    }
+
+    /// What to show under the drive's name.
+    public var backendLabel: String {
+        if let backend, !backend.isEmpty { return backend }
+        return provider.displayName
     }
 
     public var free: Int64? {

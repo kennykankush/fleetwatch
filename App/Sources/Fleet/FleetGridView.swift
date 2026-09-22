@@ -310,7 +310,7 @@ private struct CloudTile: View {
                             sourcePill
                             Spacer(minLength: 0)
                         }
-                        Text(drive.provider.displayName)
+                        Text(drive.backendLabel)
                             .font(.system(size: 10.5)).foregroundStyle(Theme.inkTertiary).lineLimit(1)
                     }
                 }
