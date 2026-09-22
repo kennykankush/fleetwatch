@@ -4,7 +4,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-VERSION=$(grep -m1 MARKETING_VERSION project.yml | awk '{print $2}' | tr -d '"')
+VERSION=$(grep -m1 'MARKETING_VERSION:' project.yml | awk '{print $2}' | tr -d '"')
 ZIP="build/Fleetwatch-$VERSION.zip"
 [ -f "$ZIP" ] || { echo "error: $ZIP not found — run scripts/release.sh first" >&2; exit 1; }
 

@@ -7,7 +7,12 @@ set -euo pipefail
 NOTARY_PROFILE="${NOTARY_PROFILE:-stockpile}"
 
 cd "$(dirname "$0")/.."
-VERSION=$(grep -m1 MARKETING_VERSION project.yml | awk '{print $2}' | tr -d '"')
+VERSION=$(grep -m1 'MARKETING_VERSION:' project.yml | awk '{print $2}' | tr -d '"')
+# A malformed version must never reach the notary or `gh release create`:
+# a stray line matching MARKETING_VERSION once shipped a literal
+# "$(MARKETING_VERSION)" tag. Fail loudly instead.
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+    echo "error: could not parse a version from project.yml (got '$VERSION')" >&2; exit 1; }
 BUILD_DIR="build"
 ARCHIVE="$BUILD_DIR/Fleetwatch.xcarchive"
 EXPORT_DIR="$BUILD_DIR/export"

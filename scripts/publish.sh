@@ -7,7 +7,12 @@ cd "$(dirname "$0")/.."
 
 [ -z "$(git status --porcelain)" ] || { echo "error: working tree is dirty — commit first" >&2; exit 1; }
 
-VERSION=$(grep -m1 MARKETING_VERSION project.yml | awk '{print $2}' | tr -d '"')
+VERSION=$(grep -m1 'MARKETING_VERSION:' project.yml | awk '{print $2}' | tr -d '"')
+# A malformed version must never reach the notary or `gh release create`:
+# a stray line matching MARKETING_VERSION once shipped a literal
+# "$(MARKETING_VERSION)" tag. Fail loudly instead.
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+    echo "error: could not parse a version from project.yml (got '$VERSION')" >&2; exit 1; }
 if git rev-parse "v$VERSION" >/dev/null 2>&1 || gh release view "v$VERSION" >/dev/null 2>&1; then
     echo "error: v$VERSION already released — bump MARKETING_VERSION in project.yml" >&2
     exit 1
