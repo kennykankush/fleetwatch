@@ -82,9 +82,7 @@ public enum RcloneConfig {
     }
 
     public static func parseProviders(_ json: String) -> [Provider] {
-        guard let data = json.data(using: .utf8),
-              let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
-        else { return [] }
+        guard let rows = decode(json) as? [[String: Any]] else { return [] }
         return rows.compactMap { row in
             guard let name = row["Name"] as? String, !name.isEmpty else { return nil }
             // Hidden backends are internal plumbing, not destinations.
@@ -128,20 +126,63 @@ public enum RcloneConfig {
 
     private static func step(_ args: [String]) async throws -> Step {
         let out = try await CloudProbe.run(args)
-        return parseStep(out)
+        return try parseStep(out)
+    }
+
+    /// rclone writes its multi-line `Help` text with **raw newlines inside
+    /// JSON string values**, which RFC 8259 forbids and `JSONSerialization`
+    /// rejects outright. Escape control characters that occur inside string
+    /// literals so the payload can actually be decoded.
+    static func repairJSON(_ raw: String) -> String {
+        var out = ""
+        out.reserveCapacity(raw.count + 128)
+        var inString = false
+        var escaped = false
+        for ch in raw {
+            if escaped { out.append(ch); escaped = false; continue }
+            switch ch {
+            case "\\" where inString: out.append(ch); escaped = true
+            case "\"": inString.toggle(); out.append(ch)
+            case "\n" where inString: out.append("\\n")
+            case "\r" where inString: out.append("\\r")
+            case "\t" where inString: out.append("\\t")
+            default: out.append(ch)
+            }
+        }
+        return out
+    }
+
+    static func decode(_ raw: String) -> Any? {
+        guard let data = raw.data(using: .utf8) else { return nil }
+        if let obj = try? JSONSerialization.jsonObject(with: data) { return obj }
+        guard let repaired = repairJSON(raw).data(using: .utf8) else { return nil }
+        return try? JSONSerialization.jsonObject(with: repaired)
     }
 
     /// `{"State": …, "Option": {…}, "Error": …}`. An empty `State` means the
     /// remote is configured; empty output means rclone had nothing left to ask.
-    public static func parseStep(_ json: String) -> Step {
+    ///
+    /// Unparseable output **throws** rather than reporting success: silently
+    /// treating a reply we couldn't read as "done" is how a remote ends up
+    /// half-configured, with a token but no drive.
+    public static func parseStep(_ json: String) throws -> Step {
         let trimmed = json.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty,
-              let data = trimmed.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return .finished }
+        guard !trimmed.isEmpty else { return .finished }
+        guard let obj = decode(trimmed) as? [String: Any] else {
+            throw CloudProbe.ProbeError.failed(
+                "Couldn't read rclone's reply:\n\(trimmed.prefix(400))")
+        }
 
         let state = (obj["State"] as? String) ?? ""
-        guard !state.isEmpty, let option = obj["Option"] as? [String: Any] else { return .finished }
+        guard !state.isEmpty else { return .finished }
+        guard let option = obj["Option"] as? [String: Any] else {
+            // A state with nothing to ask means rclone wants to be called
+            // again with an empty answer, not that the flow is over.
+            return .ask(Question(state: state, name: "", help: "", defaultValue: "",
+                                 choices: [], exclusive: false, required: false,
+                                 isPassword: false, isBool: false,
+                                 error: (obj["Error"] as? String) ?? ""))
+        }
 
         let choices: [Choice] = (option["Examples"] as? [[String: Any]] ?? []).compactMap {
             guard let v = $0["Value"] as? String else { return nil }

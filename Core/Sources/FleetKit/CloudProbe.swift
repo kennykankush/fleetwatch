@@ -79,9 +79,9 @@ public enum CloudProbe {
     }
 
     public static func parseRemotes(_ json: String) -> [Remote] {
-        guard let data = json.data(using: .utf8),
-              let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
-        else { return [] }
+        // rclone's JSON can carry raw newlines inside strings — see
+        // RcloneConfig.repairJSON.
+        guard let rows = RcloneConfig.decode(json) as? [[String: Any]] else { return [] }
         return rows.compactMap { row in
             guard let name = row["name"] as? String, !name.isEmpty else { return nil }
             let type = (row["type"] as? String) ?? ""
@@ -102,9 +102,7 @@ public enum CloudProbe {
     /// Parses `rclone about --json`. Fields are optional and arrive as JSON
     /// numbers; anything missing stays `nil` rather than becoming zero.
     public static func parse(_ json: String) -> Usage? {
-        guard let data = json.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return nil }
+        guard let obj = RcloneConfig.decode(json) as? [String: Any] else { return nil }
         func field(_ key: String) -> Int64? {
             if let n = obj[key] as? NSNumber { return n.int64Value }
             if let s = obj[key] as? String { return Int64(s) }

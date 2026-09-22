@@ -282,14 +282,40 @@ struct RcloneConfigTests {
     }
     """
 
+    // Captured verbatim from rclone 1.75. Note the LITERAL newline inside the
+    // "url" example's Help — rclone emits raw control characters inside JSON
+    // strings, which RFC 8259 forbids and JSONSerialization rejects. Parsing
+    // this used to fail, and the failure was read as "flow finished", which
+    // left a remote with a token but no drive_id.
+    static let realMultilineHelp = """
+    {
+    \t"State": "choose_type_done",
+    \t"Option": {
+    \t\t"Name": "config_type",
+    \t\t"Help": "Type of connection",
+    \t\t"Default": "onedrive",
+    \t\t"Examples": [
+    \t\t\t{"Value": "onedrive", "Help": "OneDrive Personal or Business"},
+    \t\t\t{"Value": "url", "Help": "Sharepoint site name or URL
+    E.g. mysite or https://contoso.sharepoint.com/sites/mysite"}
+    \t\t],
+    \t\t"Exclusive": true,
+    \t\t"DefaultStr": "onedrive",
+    \t\t"Type": "string"
+    \t},
+    \t"Error": "",
+    \t"Result": ""
+    }
+    """
+
     @Test("Parses a real question into something renderable")
     func parsesQuestion() throws {
-        guard case .ask(let q) = RcloneConfig.parseStep(Self.oauthQuestion) else {
+        guard case .ask(let q) = try RcloneConfig.parseStep(Self.oauthQuestion) else {
             Issue.record("expected a question"); return
         }
         #expect(q.state == "*oauth-islocal,choose_type,,")
         #expect(q.name == "config_is_local")
-        #expect(q.label == "Config Is Local")        // snake_case → human
+        #expect(q.label == "Config Is Local")        // snake_case to human
         #expect(q.isBool)
         #expect(q.exclusive)
         #expect(q.defaultValue == "true")
@@ -298,22 +324,71 @@ struct RcloneConfigTests {
         #expect(q.help.contains("web browser"))
     }
 
-    @Test("An empty State ends the conversation")
-    func finishes() {
-        #expect(RcloneConfig.parseStep(#"{"State": "", "Option": null, "Error": ""}"#) == .finished)
-        #expect(RcloneConfig.parseStep("") == .finished)          // rclone printed nothing
-        #expect(RcloneConfig.parseStep("   \n ") == .finished)
+    @Test("Survives rclone's raw newlines inside JSON strings")
+    func repairsMalformedJSON() throws {
+        // Proof the payload really is invalid JSON as rclone emits it.
+        #expect((try? JSONSerialization.jsonObject(
+            with: Data(Self.realMultilineHelp.utf8))) == nil)
+
+        guard case .ask(let q) = try RcloneConfig.parseStep(Self.realMultilineHelp) else {
+            Issue.record("expected a question, not a finished flow"); return
+        }
+        #expect(q.name == "config_type")
+        #expect(q.choices.count == 2)
+        let url = q.choices.last
+        #expect(url?.value == "url")
+        #expect(url?.help.contains("Sharepoint site name") == true)
+        #expect(url?.help.contains("contoso") == true)   // the second line survived
     }
 
-    @Test("A state with no option can't be rendered, so it ends rather than hangs")
-    func stateWithoutOption() {
-        #expect(RcloneConfig.parseStep(#"{"State": "*something", "Error": ""}"#) == .finished)
+    @Test("The repair only escapes inside strings, leaving structure alone")
+    func repairIsScoped() {
+        let repaired = RcloneConfig.repairJSON("{\n  \"a\": \"x\ny\"\n}")
+        #expect(repaired.contains("x\\ny"))            // newline inside the value escaped
+        #expect(repaired.contains("{\n"))              // newline between tokens untouched
+    }
+
+    @Test("Already-escaped content is not double-escaped")
+    func doesNotDoubleEscape() throws {
+        // In a raw string, \n is a backslash followed by n — a proper JSON
+        // escape. It must decode to one real newline, not survive as literal
+        // characters, which is what double-escaping would cause.
+        let json = #"{"State":"s","Option":{"Name":"n","Help":"a\nb","Type":"string"},"Error":""}"#
+        guard case .ask(let q) = try RcloneConfig.parseStep(json) else {
+            Issue.record("expected a question"); return
+        }
+        #expect(q.help == "a\nb")
+        #expect(q.help.count == 3)
+    }
+
+    @Test("Unreadable output throws instead of claiming the flow finished")
+    func garbageThrows() {
+        // This is the bug that half-configured a remote: a reply we can't read
+        // must never be mistaken for success.
+        #expect(throws: (any Error).self) {
+            try RcloneConfig.parseStep("this is not json at all { ")
+        }
+    }
+
+    @Test("An empty State ends the conversation")
+    func finishes() throws {
+        #expect(try RcloneConfig.parseStep(#"{"State": "", "Option": null, "Error": ""}"#) == .finished)
+        #expect(try RcloneConfig.parseStep("") == .finished)          // rclone printed nothing
+        #expect(try RcloneConfig.parseStep("   \n ") == .finished)
+    }
+
+    @Test("A state with no option means keep going, not stop")
+    func stateWithoutOption() throws {
+        guard case .ask(let q) = try RcloneConfig.parseStep(#"{"State": "*something", "Error": ""}"#) else {
+            Issue.record("a non-empty state must continue the flow"); return
+        }
+        #expect(q.state == "*something")
     }
 
     @Test("A rejected answer surfaces rclone's error with the next question")
     func carriesError() throws {
         let json = #"{"State":"s","Option":{"Name":"n","Type":"string","DefaultStr":""},"Error":"that wasn't valid"}"#
-        guard case .ask(let q) = RcloneConfig.parseStep(json) else {
+        guard case .ask(let q) = try RcloneConfig.parseStep(json) else {
             Issue.record("expected a question"); return
         }
         #expect(q.error == "that wasn't valid")
@@ -323,7 +398,7 @@ struct RcloneConfigTests {
     @Test("Sensitive fields are treated as passwords even when IsPassword is false")
     func sensitiveIsMasked() throws {
         let json = #"{"State":"s","Option":{"Name":"token","Type":"string","IsPassword":false,"Sensitive":true},"Error":""}"#
-        guard case .ask(let q) = RcloneConfig.parseStep(json) else {
+        guard case .ask(let q) = try RcloneConfig.parseStep(json) else {
             Issue.record("expected a question"); return
         }
         #expect(q.isPassword)
@@ -345,6 +420,6 @@ struct RcloneConfigTests {
         let ordered = RcloneConfig.sort(parsed).map(\.name)
         #expect(ordered.first == "drive")                  // preferred order
         #expect(ordered[1] == "onedrive")
-        #expect(ordered.last == "zoho")                    // unlisted → alphabetical
+        #expect(ordered.last == "zoho")                    // unlisted goes alphabetical
     }
 }
