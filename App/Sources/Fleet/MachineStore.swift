@@ -17,8 +17,12 @@ final class MachineStore {
     var online: [UUID: Bool] = [:]
     var refreshing: Set<UUID> = []
     var lastError: [UUID: String] = [:]
+    /// Last-known size per machine, persisted. This is what lets a sleeping
+    /// magi keep contributing its 2 TB to the fleet's owned strength.
+    private(set) var capacities: [UUID: CapacitySnapshot] = [:]
 
     private let defaultsKey = "fleet.remotes"
+    private let capacityKey = "fleet.capacity.v1"
 
     var local: Machine { machines.first { $0.kind == .local } ?? .thisMac(name: "This Mac") }
     var remotes: [Machine] { machines.filter { $0.kind == .remote } }
@@ -26,6 +30,14 @@ final class MachineStore {
     init() {
         let localName = (Host.current().localizedName ?? "This Mac")
         machines = [Machine.thisMac(name: localName)] + loadRemotes()
+        capacities = loadCapacities()
+    }
+
+    /// The fleet's total strength — machines (live or last-known) plus every
+    /// declared cloud drive.
+    func strength(clouds: [CloudDrive]) -> FleetStrength {
+        FleetStrength.compute(machines: machines, telemetry: telemetry,
+                              capacities: capacities, online: online, clouds: clouds)
     }
 
     // MARK: fleet mutation
@@ -50,7 +62,9 @@ final class MachineStore {
         guard machine.kind == .remote else { return }
         machines.removeAll { $0.id == machine.id }
         telemetry[machine.id] = nil; online[machine.id] = nil
+        capacities[machine.id] = nil
         saveRemotes()
+        saveCapacities()
     }
 
     // MARK: telemetry
@@ -72,6 +86,13 @@ final class MachineStore {
         refreshing.insert(machine.id)
         defer {
             refreshing.remove(machine.id)
+            // Remember how big it is. `online` is only true when a probe
+            // succeeded *this* cycle, so a failed refresh keeps the previous
+            // snapshot and its honest measurement date.
+            if online[machine.id] == true, let t = telemetry[machine.id] {
+                capacities[machine.id] = CapacitySnapshot(t)
+                saveCapacities()
+            }
             FleetMonitor.shared.record(machine.id, name: machine.name,
                                        telemetry: telemetry[machine.id], online: online[machine.id] ?? false)
         }
@@ -122,6 +143,20 @@ final class MachineStore {
     private func saveRemotes() {
         if let data = try? JSONEncoder().encode(remotes) {
             UserDefaults.standard.set(data, forKey: defaultsKey)
+        }
+    }
+
+    // MARK: persistence (capacity — the only telemetry worth keeping)
+
+    private func loadCapacities() -> [UUID: CapacitySnapshot] {
+        guard let data = UserDefaults.standard.data(forKey: capacityKey),
+              let decoded = try? JSONDecoder().decode([UUID: CapacitySnapshot].self, from: data) else { return [:] }
+        return decoded
+    }
+
+    private func saveCapacities() {
+        if let data = try? JSONEncoder().encode(capacities) {
+            UserDefaults.standard.set(data, forKey: capacityKey)
         }
     }
 }
