@@ -117,7 +117,8 @@ public enum CloudProbe {
         return usage
     }
 
-    private static func run(_ arguments: [String]) async throws -> String {
+    /// Runs the rclone binary and returns stdout. Shared with `RcloneConfig`.
+    static func run(_ arguments: [String]) async throws -> String {
         guard let path = executablePath else { throw ProbeError.rcloneMissing }
         return try await withCheckedThrowingContinuation { continuation in
             let process = Process()

@@ -24,6 +24,7 @@ struct AddCloudView: View {
     @State private var measuredUsed: Int64?
     @State private var probing = false
     @State private var probeError: String?
+    @State private var connecting = false
 
     private enum Unit: String, CaseIterable, Identifiable {
         case gb = "GB", tb = "TB"
@@ -47,7 +48,7 @@ struct AddCloudView: View {
                     .font(.system(size: 12)).foregroundStyle(.secondary)
             }
 
-            if store.rcloneAvailable && !store.availableRemotes.isEmpty {
+            if store.rcloneAvailable {
                 remoteSection
                 Divider().overlay(Theme.hairline)
             } else {
@@ -115,9 +116,21 @@ struct AddCloudView: View {
 
     private var remoteSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            fieldLabel("Read from an rclone remote")
+            HStack {
+                fieldLabel("Connected account")
+                Spacer()
+                Button {
+                    connecting = true
+                } label: {
+                    Label("Connect new…", systemImage: "plus.circle")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .buttonStyle(.plain).foregroundStyle(Theme.accent)
+            }
             Picker("", selection: $remote) {
-                Text("Don't link — I'll enter it myself").tag("")
+                Text(store.availableRemotes.isEmpty
+                     ? "None connected — I'll enter it myself"
+                     : "Don't link — I'll enter it myself").tag("")
                 ForEach(store.availableRemotes) { r in
                     Text("\(r.name)  ·  \(r.description)").tag(r.name)
                 }
@@ -125,6 +138,11 @@ struct AddCloudView: View {
             .labelsHidden().pickerStyle(.menu)
             .onChange(of: remote) { _, new in
                 Task { await link(new) }
+            }
+            .sheet(isPresented: $connecting) {
+                ConnectCloudView { connected in
+                    remote = connected.name        // fires link() and fills everything in
+                }
             }
 
             if probing {
@@ -147,6 +165,9 @@ struct AddCloudView: View {
                     Text("\(backend ?? provider.displayName) reports \(capacityBytes.bytesFormatted) · \(used.bytesFormatted) used")
                         .font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
                 }
+            } else if store.availableRemotes.isEmpty {
+                Text("Connect an account and the capacity and usage fill themselves in.")
+                    .font(.system(size: 10.5)).foregroundStyle(Theme.inkTertiary)
             } else {
                 Text("rclone holds the credentials — Fleetwatch never sees them.")
                     .font(.system(size: 10.5)).foregroundStyle(Theme.inkTertiary)

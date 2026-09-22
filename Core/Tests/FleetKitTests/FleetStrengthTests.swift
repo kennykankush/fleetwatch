@@ -254,3 +254,97 @@ struct CloudRemoteTests {
         #expect(CloudDrive(name: "x", provider: .dropbox, capacity: 1).backendLabel == "Dropbox")
     }
 }
+
+@Suite("rclone in-app config protocol")
+struct RcloneConfigTests {
+    // The real first question for `rclone config create x onedrive
+    // --non-interactive` (rclone 1.75), trimmed of irrelevant keys.
+    static let oauthQuestion = """
+    {
+      "State": "*oauth-islocal,choose_type,,",
+      "Option": {
+        "Name": "config_is_local",
+        "Help": "Use web browser to automatically authenticate rclone with remote?\\n * Say Y if the machine running rclone has a web browser you can use\\n",
+        "Default": true,
+        "Examples": [
+          {"Value": "true", "Help": "Yes"},
+          {"Value": "false", "Help": "No"}
+        ],
+        "Required": false,
+        "IsPassword": false,
+        "Exclusive": true,
+        "Sensitive": false,
+        "DefaultStr": "true",
+        "Type": "bool"
+      },
+      "Error": "",
+      "Result": ""
+    }
+    """
+
+    @Test("Parses a real question into something renderable")
+    func parsesQuestion() throws {
+        guard case .ask(let q) = RcloneConfig.parseStep(Self.oauthQuestion) else {
+            Issue.record("expected a question"); return
+        }
+        #expect(q.state == "*oauth-islocal,choose_type,,")
+        #expect(q.name == "config_is_local")
+        #expect(q.label == "Config Is Local")        // snake_case → human
+        #expect(q.isBool)
+        #expect(q.exclusive)
+        #expect(q.defaultValue == "true")
+        #expect(q.choices.count == 2)
+        #expect(q.choices.first?.help == "Yes")
+        #expect(q.help.contains("web browser"))
+    }
+
+    @Test("An empty State ends the conversation")
+    func finishes() {
+        #expect(RcloneConfig.parseStep(#"{"State": "", "Option": null, "Error": ""}"#) == .finished)
+        #expect(RcloneConfig.parseStep("") == .finished)          // rclone printed nothing
+        #expect(RcloneConfig.parseStep("   \n ") == .finished)
+    }
+
+    @Test("A state with no option can't be rendered, so it ends rather than hangs")
+    func stateWithoutOption() {
+        #expect(RcloneConfig.parseStep(#"{"State": "*something", "Error": ""}"#) == .finished)
+    }
+
+    @Test("A rejected answer surfaces rclone's error with the next question")
+    func carriesError() throws {
+        let json = #"{"State":"s","Option":{"Name":"n","Type":"string","DefaultStr":""},"Error":"that wasn't valid"}"#
+        guard case .ask(let q) = RcloneConfig.parseStep(json) else {
+            Issue.record("expected a question"); return
+        }
+        #expect(q.error == "that wasn't valid")
+        #expect(!q.isBool)
+    }
+
+    @Test("Sensitive fields are treated as passwords even when IsPassword is false")
+    func sensitiveIsMasked() throws {
+        let json = #"{"State":"s","Option":{"Name":"token","Type":"string","IsPassword":false,"Sensitive":true},"Error":""}"#
+        guard case .ask(let q) = RcloneConfig.parseStep(json) else {
+            Issue.record("expected a question"); return
+        }
+        #expect(q.isPassword)
+    }
+
+    @Test("Providers parse, drop hidden ones, and list cloud drives first")
+    func providers() {
+        let json = """
+        [
+          {"Name":"s3","Description":"Amazon S3","Hide":false},
+          {"Name":"onedrive","Description":"Microsoft OneDrive","Hide":false},
+          {"Name":"secret","Description":"Internal","Hide":true},
+          {"Name":"drive","Description":"Google Drive","Hide":false},
+          {"Name":"zoho","Description":"Zoho","Hide":false}
+        ]
+        """
+        let parsed = RcloneConfig.parseProviders(json)
+        #expect(parsed.count == 4)                         // hidden one dropped
+        let ordered = RcloneConfig.sort(parsed).map(\.name)
+        #expect(ordered.first == "drive")                  // preferred order
+        #expect(ordered[1] == "onedrive")
+        #expect(ordered.last == "zoho")                    // unlisted → alphabetical
+    }
+}

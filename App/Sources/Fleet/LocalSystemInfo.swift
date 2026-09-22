@@ -46,7 +46,8 @@ enum LocalSystemInfo {
         guard size > 0 else { return "" }
         var buf = [CChar](repeating: 0, count: size)
         sysctlbyname(name, &buf, &size, nil, 0)
-        return String(cString: buf)
+        // Truncate at the NUL ourselves — String(cString:) is deprecated.
+        return String(decoding: buf.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
     }
 
     private static func sysctlInt(_ name: String) -> Int {
