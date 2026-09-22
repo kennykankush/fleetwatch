@@ -7,7 +7,7 @@ cask "fleetwatch" do
   desc "Health & hardware monitor for your fleet of machines"
   homepage "https://github.com/kennykankush/fleetwatch"
 
-  depends_on macos: ">= :tahoe"
+  depends_on macos: :tahoe
 
   app "Fleetwatch.app"
 
